@@ -146,7 +146,7 @@ function googleEventToTask(event: Record<string, any>) {
     id: String(event.id),
     title: String(event.summary || 'אירוע מהיומן'),
     dueDate: start,
-    notes: description.replace(/\n\nנוצר ממאנדי בית\.[\s\S]*$/m, '').trim(),
+    notes: description.replace(/\n\nנוצר מצ'ק ליסט בית\.[\s\S]*$/m, '').trim(),
     updatedAt: String(event.updated ?? ''),
   }
 }
@@ -175,7 +175,7 @@ function taskToGoogleEvent(task: SyncTask) {
     description: [
       task.notes ?? '',
       '',
-      'נוצר ממאנדי בית.',
+      "נוצר מצ'ק ליסט בית.",
       `סטטוס: ${task.status || 'לא התחיל'}`,
       `עדיפות: ${task.priority || 'בינוני'}`,
       task.assignee ? `אחראי: ${task.assignee}` : '',

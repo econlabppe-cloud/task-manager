@@ -47,7 +47,7 @@ export const IntegrationHub: React.FC<Props> = ({ bridgeStatus, onGoogleCalendar
   const sendTest = async () => {
     try {
       await captureExternalTask(testText, 'shortcut')
-      setMessage('נשלח לגשר. מאנדי ימשוך את זה כמשימה חכמה בעוד רגע.')
+      setMessage("נשלח לגשר. צ'ק ליסט בית ימשוך את זה כמשימה חכמה בעוד רגע.")
     } catch {
       setMessage('הגשר לא מחובר כרגע. הפעילו npm run bridge בחלון נפרד.')
     }
@@ -71,7 +71,7 @@ export const IntegrationHub: React.FC<Props> = ({ bridgeStatus, onGoogleCalendar
         <div>
           <h2 className="text-base font-bold text-gray-900">חיבורים ואפליקציה</h2>
           <p className="text-xs text-gray-500 mt-1">
-            מאנדי יכול לקבל משימות מבחוץ: קיצור דרך, n8n, ווב־הוק, או בוט ווצאפ דרך Cloud API.
+            צ'ק ליסט בית יכול לקבל משימות מבחוץ: קיצור דרך, n8n, ווב־הוק, או בוט ווצאפ דרך Cloud API.
           </p>
         </div>
         <span className={`text-xs font-semibold rounded border px-3 py-1.5 ${statusClass[bridgeStatus]}`}>
@@ -83,7 +83,7 @@ export const IntegrationHub: React.FC<Props> = ({ bridgeStatus, onGoogleCalendar
         <div className="border border-gray-200 rounded p-3 bg-gray-50">
           <div className="text-xs font-bold text-gray-700">אפליקציה להתקנה</div>
           <p className="text-xs text-gray-500 leading-5 mt-2">
-            במסך הבית של הדפדפן אפשר להתקין את מאנדי כאפליקציה. היא תיפתח במסך נקי ותמשיך לשמור נתונים מקומית.
+            במסך הבית של הדפדפן אפשר להתקין את צ'ק ליסט בית כאפליקציה. היא תיפתח במסך נקי ותמשיך לשמור נתונים מקומית.
           </p>
         </div>
 
@@ -129,7 +129,7 @@ export const IntegrationHub: React.FC<Props> = ({ bridgeStatus, onGoogleCalendar
         <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
           <div className="text-xs font-bold text-gray-700">סנכרון דו־כיווני עם Google Calendar</div>
           <span className={`text-[11px] font-semibold rounded border px-2 py-1 ${googleConnected ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
-            {googleConnected ? 'מחובר לגוגל' : 'צריך התחברות'}
+            {googleConnected ? 'היומן מחובר' : 'צריך לחבר יומן'}
           </span>
         </div>
         <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_130px_150px]">
@@ -144,7 +144,7 @@ export const IntegrationHub: React.FC<Props> = ({ bridgeStatus, onGoogleCalendar
             href={googleAuthUrl || undefined}
             className={`rounded text-center text-xs font-semibold px-3 py-2 transition-colors ${googleAuthUrl ? 'bg-sky-700 text-white hover:bg-sky-800' : 'bg-gray-200 text-gray-400 pointer-events-none'}`}
           >
-            התחברות לגוגל
+            חבר יומן
           </a>
           <button
             type="button"
@@ -156,7 +156,7 @@ export const IntegrationHub: React.FC<Props> = ({ bridgeStatus, onGoogleCalendar
           </button>
         </div>
         <p className="text-[11px] text-gray-400 mt-2">
-          התחברות גוגל מייבאת אירועים למאנדי ומייצאת משימות מתוארכות ליומן. קישור ICS נשאר כגיבוי לייבוא חד־כיווני בלבד.
+          חיבור יומן מייבא אירועים לצ'ק ליסט בית ומייצא משימות מתוארכות ליומן. קישור ICS נשאר כגיבוי לייבוא חד־כיווני בלבד.
         </p>
       </div>
 
