@@ -34,6 +34,7 @@ export interface Task {
   recurringInstanceDate?: string
   externalSource?: 'google-calendar' | 'whatsapp' | 'api'
   externalId?: string
+  externalUpdatedAt?: string
   order: number
 }
 

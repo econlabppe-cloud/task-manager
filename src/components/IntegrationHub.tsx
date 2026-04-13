@@ -1,5 +1,6 @@
 import React from 'react'
 import { BridgeStatus, captureExternalTask } from '../apiBridge'
+import { fetchGoogleCalendarAuthStatus } from '../googleCalendarSync'
 
 interface Props {
   bridgeStatus: BridgeStatus
@@ -23,6 +24,19 @@ export const IntegrationHub: React.FC<Props> = ({ bridgeStatus, onGoogleCalendar
   const [calendarUrl, setCalendarUrl] = React.useState('')
   const [syncingCalendar, setSyncingCalendar] = React.useState(false)
   const [message, setMessage] = React.useState('')
+  const [googleConnected, setGoogleConnected] = React.useState(false)
+  const [googleAuthUrl, setGoogleAuthUrl] = React.useState('')
+
+  React.useEffect(() => {
+    void fetchGoogleCalendarAuthStatus()
+      .then(status => {
+        setGoogleConnected(status.connected)
+        setGoogleAuthUrl(status.authUrl ?? '')
+      })
+      .catch(() => {
+        setGoogleConnected(false)
+      })
+  }, [])
 
   React.useEffect(() => {
     if (!message) return
@@ -43,9 +57,9 @@ export const IntegrationHub: React.FC<Props> = ({ bridgeStatus, onGoogleCalendar
     setSyncingCalendar(true)
     try {
       const added = await onGoogleCalendarSync(calendarUrl)
-      setMessage(added > 0 ? `יובאו ${added} אירועים מיומן Google כמשימות.` : 'היומן הסתנכרן, לא נמצאו משימות חדשות.')
+      setMessage(added > 0 ? `סונכרן דו־כיוונית. יובאו ${added} אירועים חדשים מיומן Google.` : 'סונכרן דו־כיוונית, לא נמצאו משימות חדשות לייבוא.')
     } catch {
-      setMessage('לא הצלחתי לסנכרן את Google Calendar. בדקו GOOGLE_CALENDAR_ICS_URL בוורסל או הדביקו קישור ICS פרטי.')
+      setMessage('לא הצלחתי לסנכרן את Google Calendar. התחברו לגוגל או הדביקו קישור ICS פרטי לייבוא בלבד.')
     } finally {
       setSyncingCalendar(false)
     }
@@ -112,26 +126,37 @@ export const IntegrationHub: React.FC<Props> = ({ bridgeStatus, onGoogleCalendar
       </div>
 
       <div className="mt-4 border-t border-gray-200 pt-4">
-        <div className="text-xs font-bold text-gray-700 mb-2">סנכרון Google Calendar לתוך מאנדי</div>
-        <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_150px]">
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
+          <div className="text-xs font-bold text-gray-700">סנכרון דו־כיווני עם Google Calendar</div>
+          <span className={`text-[11px] font-semibold rounded border px-2 py-1 ${googleConnected ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+            {googleConnected ? 'מחובר לגוגל' : 'צריך התחברות'}
+          </span>
+        </div>
+        <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_130px_150px]">
           <input
             value={calendarUrl}
             onChange={event => setCalendarUrl(event.target.value)}
             dir="ltr"
-            placeholder="אופציונלי: Private ICS URL, או להשאיר ריק אם הוגדר GOOGLE_CALENDAR_ICS_URL בוורסל"
+            placeholder="אופציונלי: Private ICS URL לייבוא בלבד. לסנכרון דו־כיווני השאירו ריק והתחברו לגוגל"
             className="rounded border border-gray-200 px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-cyan-300"
           />
+          <a
+            href={googleAuthUrl || undefined}
+            className={`rounded text-center text-xs font-semibold px-3 py-2 transition-colors ${googleAuthUrl ? 'bg-sky-700 text-white hover:bg-sky-800' : 'bg-gray-200 text-gray-400 pointer-events-none'}`}
+          >
+            התחברות לגוגל
+          </a>
           <button
             type="button"
             onClick={syncCalendar}
             disabled={syncingCalendar}
             className="rounded bg-emerald-700 text-white text-xs font-semibold px-3 py-2 hover:bg-emerald-800 disabled:bg-gray-300 transition-colors"
           >
-            {syncingCalendar ? 'מסנכרן...' : 'ייבא מהיומן'}
+            {syncingCalendar ? 'מסנכרן...' : 'סנכרן דו־כיווני'}
           </button>
         </div>
         <p className="text-[11px] text-gray-400 mt-2">
-          לייבוא אוטומטי בפריסה: הגדירו ב־Vercel את המשתנה GOOGLE_CALENDAR_ICS_URL עם כתובת ה־Secret iCal של היומן.
+          התחברות גוגל מייבאת אירועים למאנדי ומייצאת משימות מתוארכות ליומן. קישור ICS נשאר כגיבוי לייבוא חד־כיווני בלבד.
         </p>
       </div>
 

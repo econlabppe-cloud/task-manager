@@ -7,6 +7,30 @@ function json(status: number, body: unknown) {
   })
 }
 
+const TOKEN_COOKIE = 'mandy_google_calendar_token'
+const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
+const GOOGLE_EVENTS_URL = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
+declare const Buffer: any
+
+interface GoogleToken {
+  access_token: string
+  refresh_token?: string
+  expires_in?: number
+  created_at?: number
+  token_type?: string
+}
+
+interface SyncTask {
+  id: string
+  title: string
+  dueDate: string
+  notes?: string
+  status?: string
+  priority?: string
+  assignee?: string
+  externalId?: string
+}
+
 function unfoldIcs(raw: string) {
   return raw.replace(/\r?\n[ \t]/g, '')
 }
@@ -77,13 +101,158 @@ function parseEvents(rawIcs: string) {
     .slice(0, 100)
 }
 
+function decodeCookieToken(request: Request): GoogleToken | null {
+  const cookie = request.headers.get('cookie') ?? ''
+  const tokenCookie = cookie.split(';').map(part => part.trim()).find(part => part.startsWith(`${TOKEN_COOKIE}=`))
+  if (!tokenCookie) return null
+
+  try {
+    return JSON.parse(Buffer.from(tokenCookie.slice(TOKEN_COOKIE.length + 1), 'base64url').toString('utf8')) as GoogleToken
+  } catch {
+    return null
+  }
+}
+
+async function getAccessToken(request: Request): Promise<string | null> {
+  const token = decodeCookieToken(request)
+  if (!token?.access_token) return null
+  const expiresAt = (token.created_at ?? 0) + ((token.expires_in ?? 3600) - 60) * 1000
+  if (!token.refresh_token || Date.now() < expiresAt) return token.access_token
+
+  const clientId = process.env.GOOGLE_CLIENT_ID
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET
+  if (!clientId || !clientSecret) return token.access_token
+
+  const refreshResponse = await fetch(GOOGLE_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: token.refresh_token,
+      grant_type: 'refresh_token',
+    }),
+  })
+  if (!refreshResponse.ok) return token.access_token
+  const refreshed = await refreshResponse.json() as GoogleToken
+  return refreshed.access_token || token.access_token
+}
+
+function googleEventToTask(event: Record<string, any>) {
+  const start = event.start?.date || String(event.start?.dateTime ?? '').slice(0, 10)
+  const description = String(event.description ?? '')
+  return {
+    id: String(event.id),
+    title: String(event.summary || 'אירוע מהיומן'),
+    dueDate: start,
+    notes: description.replace(/\n\nנוצר ממאנדי בית\.[\s\S]*$/m, '').trim(),
+    updatedAt: String(event.updated ?? ''),
+  }
+}
+
+async function fetchGoogleEvents(accessToken: string) {
+  const now = new Date()
+  now.setHours(0, 0, 0, 0)
+  const max = new Date(now)
+  max.setDate(max.getDate() + 60)
+  const url = new URL(GOOGLE_EVENTS_URL)
+  url.searchParams.set('singleEvents', 'true')
+  url.searchParams.set('orderBy', 'startTime')
+  url.searchParams.set('maxResults', '100')
+  url.searchParams.set('timeMin', now.toISOString())
+  url.searchParams.set('timeMax', max.toISOString())
+
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } })
+  if (!response.ok) throw new Error('google_events_fetch_failed')
+  const body = await response.json() as { items?: Record<string, any>[] }
+  return (body.items ?? []).map(googleEventToTask).filter(event => event.dueDate)
+}
+
+function taskToGoogleEvent(task: SyncTask) {
+  return {
+    summary: task.title,
+    description: [
+      task.notes ?? '',
+      '',
+      'נוצר ממאנדי בית.',
+      `סטטוס: ${task.status || 'לא התחיל'}`,
+      `עדיפות: ${task.priority || 'בינוני'}`,
+      task.assignee ? `אחראי: ${task.assignee}` : '',
+      `Mandy Task ID: ${task.id}`,
+    ].filter(Boolean).join('\n'),
+    start: { date: task.dueDate },
+    end: { date: task.dueDate },
+    extendedProperties: {
+      private: {
+        mandyTaskId: task.id,
+        mandySource: 'mandy-home',
+      },
+    },
+  }
+}
+
+async function exportTasksToGoogle(accessToken: string, tasks: SyncTask[]) {
+  let exported = 0
+  const exportedTasks: Array<{ taskId: string, eventId: string }> = []
+  for (const task of tasks.slice(0, 100)) {
+    if (!task.title?.trim() || !task.dueDate) continue
+    const eventBody = taskToGoogleEvent(task)
+    const eventUrl = task.externalId ? `${GOOGLE_EVENTS_URL}/${encodeURIComponent(task.externalId)}` : GOOGLE_EVENTS_URL
+    const response = await fetch(eventUrl, {
+      method: task.externalId ? 'PATCH' : 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(eventBody),
+    })
+    if (response.ok) {
+      const body = await response.json().catch(() => ({})) as { id?: string }
+      exported += 1
+      if (body.id) exportedTasks.push({ taskId: task.id, eventId: body.id })
+    }
+  }
+  return { exported, exportedTasks }
+}
+
+async function oauthSync(request: Request) {
+  const accessToken = await getAccessToken(request)
+  if (!accessToken) {
+    return json(401, {
+      ok: false,
+      error: 'google_calendar_not_connected',
+      message: 'Connect Google Calendar first.',
+    })
+  }
+
+  let tasks: SyncTask[] = []
+  if (request.method === 'POST') {
+    const body = await request.json().catch(() => ({ tasks: [] })) as { tasks?: SyncTask[] }
+    tasks = Array.isArray(body.tasks) ? body.tasks : []
+  }
+
+  const exportResult = request.method === 'POST' ? await exportTasksToGoogle(accessToken, tasks) : { exported: 0, exportedTasks: [] }
+  const events = await fetchGoogleEvents(accessToken)
+  return json(200, {
+    ok: true,
+    events,
+    exported: exportResult.exported,
+    exportedTasks: exportResult.exportedTasks,
+    syncedAt: new Date().toISOString(),
+  })
+}
+
 export default {
   async fetch(request: Request) {
+    if (request.method === 'POST') return oauthSync(request)
+
     if (request.method !== 'GET') {
       return json(405, { ok: false, error: 'method_not_allowed' })
     }
 
     const url = new URL(request.url)
+    if (decodeCookieToken(request) && !url.searchParams.get('url')) return oauthSync(request)
+
     const calendarUrl = url.searchParams.get('url') || process.env.GOOGLE_CALENDAR_ICS_URL
     if (!calendarUrl || !/^https:\/\/.+/i.test(String(calendarUrl))) {
       return json(400, {

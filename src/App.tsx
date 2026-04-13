@@ -10,7 +10,7 @@ import { requestNotificationPermission, checkDueTasks } from './notifications'
 import { parseSmartTask } from './taskIntelligence'
 import { ackBridgeCapture, checkBridgeHealth, fetchBridgeInbox } from './apiBridge'
 import type { BridgeCapture, BridgeStatus } from './apiBridge'
-import { fetchGoogleCalendarTasks, googleEventToTaskDefaults } from './googleCalendarSync'
+import { fetchGoogleCalendarTasks, googleEventToTaskDefaults, syncGoogleCalendarBidirectional } from './googleCalendarSync'
 import { Header } from './components/Header'
 import { StatsBar } from './components/StatsBar'
 import { FilterBar } from './components/FilterBar'
@@ -199,11 +199,15 @@ export default function App() {
   }
 
   const syncGoogleCalendar = async (calendarUrl?: string): Promise<number> => {
-    const result = await fetchGoogleCalendarTasks(calendarUrl)
+    const result = calendarUrl?.trim()
+      ? await fetchGoogleCalendarTasks(calendarUrl)
+      : await syncGoogleCalendarBidirectional(state.groups.flatMap(group => group.tasks))
     if (!result.ok) throw new Error(result.error ?? 'google_calendar_sync_failed')
 
     let addedCount = 0
     setState(current => {
+      const exportedIds = new Map((result.exportedTasks ?? []).map(item => [item.taskId, item.eventId]))
+      const importedById = new Map(result.events.map(event => [event.id, event]))
       const existingExternalIds = new Set(
         current.groups.flatMap(group =>
           group.tasks
@@ -219,15 +223,32 @@ export default function App() {
         !existingExternalIds.has(event.id) && !fallbackTitleDates.has(`${event.title}|${event.dueDate}`)
       )
       addedCount = importedEvents.length
-      if (importedEvents.length === 0) return current
+      const groupsWithExportIds = current.groups.map(group => ({
+        ...group,
+        tasks: group.tasks.map(task =>
+          exportedIds.has(task.id)
+            ? { ...task, externalSource: 'google-calendar' as const, externalId: exportedIds.get(task.id), externalUpdatedAt: result.syncedAt }
+            : task.externalSource === 'google-calendar' && task.externalId && importedById.has(task.externalId)
+              ? {
+                  ...task,
+                  title: importedById.get(task.externalId)?.title ?? task.title,
+                  dueDate: importedById.get(task.externalId)?.dueDate ?? task.dueDate,
+                  notes: googleEventToTaskDefaults(importedById.get(task.externalId)!).notes ?? task.notes,
+                  externalUpdatedAt: importedById.get(task.externalId)?.updatedAt ?? task.externalUpdatedAt,
+                }
+            : task
+        ),
+      }))
+      const baseState = { ...current, groups: groupsWithExportIds }
+      if (importedEvents.length === 0) return baseState
 
-      const existingGroup = current.groups.find(group => group.title === GOOGLE_CALENDAR_GROUP_TITLE)
+      const existingGroup = groupsWithExportIds.find(group => group.title === GOOGLE_CALENDAR_GROUP_TITLE)
       const targetGroup = existingGroup ?? {
         id: `group-google-calendar-${genId()}`,
         title: GOOGLE_CALENDAR_GROUP_TITLE,
         color: 'teal',
         collapsed: false,
-        order: current.groups.length,
+        order: groupsWithExportIds.length,
         tasks: [],
       }
 
@@ -243,16 +264,16 @@ export default function App() {
 
       if (existingGroup) {
         return {
-          ...current,
-          groups: current.groups.map(group =>
+          ...baseState,
+          groups: groupsWithExportIds.map(group =>
             group.id === existingGroup.id ? { ...group, tasks: [...group.tasks, ...newTasks] } : group
           ),
         }
       }
 
       return {
-        ...current,
-        groups: [...current.groups, { ...targetGroup, tasks: newTasks }],
+        ...baseState,
+        groups: [...groupsWithExportIds, { ...targetGroup, tasks: newTasks }],
       }
     })
 
