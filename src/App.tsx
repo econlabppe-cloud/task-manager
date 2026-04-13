@@ -10,6 +10,7 @@ import { requestNotificationPermission, checkDueTasks } from './notifications'
 import { parseSmartTask } from './taskIntelligence'
 import { ackBridgeCapture, checkBridgeHealth, fetchBridgeInbox } from './apiBridge'
 import type { BridgeCapture, BridgeStatus } from './apiBridge'
+import { fetchGoogleCalendarTasks, googleEventToTaskDefaults } from './googleCalendarSync'
 import { Header } from './components/Header'
 import { StatsBar } from './components/StatsBar'
 import { FilterBar } from './components/FilterBar'
@@ -21,9 +22,11 @@ import { IntegrationHub } from './components/IntegrationHub'
 import { CalendarView } from './components/CalendarView'
 import { AnalyticsPanel } from './components/AnalyticsPanel'
 import { ExportImport } from './components/ExportImport'
+import { MobileBottomNav } from './components/MobileBottomNav'
 
 const GROUP_COLORS = ['purple', 'blue', 'green', 'orange', 'teal', 'red', 'pink', 'indigo']
 const PROCESSED_CAPTURE_KEY = 'mandy-processed-captures-v1'
+const GOOGLE_CALENDAR_GROUP_TITLE = 'יומן גוגל'
 
 function genId(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
@@ -195,6 +198,74 @@ export default function App() {
     return result.addedCount
   }
 
+  const syncGoogleCalendar = async (calendarUrl?: string): Promise<number> => {
+    const result = await fetchGoogleCalendarTasks(calendarUrl)
+    if (!result.ok) throw new Error(result.error ?? 'google_calendar_sync_failed')
+
+    let addedCount = 0
+    setState(current => {
+      const existingExternalIds = new Set(
+        current.groups.flatMap(group =>
+          group.tasks
+            .filter(task => task.externalSource === 'google-calendar' && task.externalId)
+            .map(task => task.externalId as string)
+        )
+      )
+      const fallbackTitleDates = new Set(
+        current.groups.flatMap(group => group.tasks.map(task => `${task.title}|${task.dueDate}`))
+      )
+
+      const importedEvents = result.events.filter(event =>
+        !existingExternalIds.has(event.id) && !fallbackTitleDates.has(`${event.title}|${event.dueDate}`)
+      )
+      addedCount = importedEvents.length
+      if (importedEvents.length === 0) return current
+
+      const existingGroup = current.groups.find(group => group.title === GOOGLE_CALENDAR_GROUP_TITLE)
+      const targetGroup = existingGroup ?? {
+        id: `group-google-calendar-${genId()}`,
+        title: GOOGLE_CALENDAR_GROUP_TITLE,
+        color: 'teal',
+        collapsed: false,
+        order: current.groups.length,
+        tasks: [],
+      }
+
+      const newTasks: Task[] = importedEvents.map((event, index) => ({
+        id: `task-google-${event.id.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 36)}-${genId()}`,
+        title: event.title,
+        ...googleEventToTaskDefaults(event),
+        subtasks: [],
+        tags: ['tag-weekly'],
+        order: targetGroup.tasks.length + index,
+        createdAt: result.syncedAt ?? new Date().toISOString(),
+      } as Task))
+
+      if (existingGroup) {
+        return {
+          ...current,
+          groups: current.groups.map(group =>
+            group.id === existingGroup.id ? { ...group, tasks: [...group.tasks, ...newTasks] } : group
+          ),
+        }
+      }
+
+      return {
+        ...current,
+        groups: [...current.groups, { ...targetGroup, tasks: newTasks }],
+      }
+    })
+
+    return addedCount
+  }
+
+  React.useEffect(() => {
+    void syncGoogleCalendar().catch(() => {
+      // Calendar sync is optional until GOOGLE_CALENDAR_ICS_URL is configured.
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // ── Import ───────────────────────────────────────────────────────
   const handleImport = (imported: BoardState) =>
     setState({ ...imported, darkMode: state.darkMode, viewMode: state.viewMode })
@@ -250,7 +321,7 @@ export default function App() {
               />
               <div className="grid sm:grid-cols-2 gap-3">
                 <ExportImport state={state} onImport={handleImport} darkMode={dm} />
-                <IntegrationHub bridgeStatus={bridgeStatus} />
+                <IntegrationHub bridgeStatus={bridgeStatus} onGoogleCalendarSync={syncGoogleCalendar} />
               </div>
             </div>
           )}
@@ -258,7 +329,7 @@ export default function App() {
       </div>
 
       {/* Main */}
-      <main className={`flex-1 overflow-y-auto ${mainBg}`}>
+      <main className={`flex-1 overflow-y-auto ${mainBg} pb-20 sm:pb-0`}>
         <div className="max-w-6xl mx-auto px-4 py-5">
 
           {state.viewMode === 'board' && (
@@ -308,6 +379,16 @@ export default function App() {
           )}
         </div>
       </main>
+      <MobileBottomNav
+        viewMode={state.viewMode}
+        toolsOpen={showTools}
+        onViewChange={mode => {
+          setShowTools(false)
+          setViewMode(mode)
+        }}
+        onToolsToggle={() => setShowTools(open => !open)}
+        darkMode={dm}
+      />
     </div>
   )
 }

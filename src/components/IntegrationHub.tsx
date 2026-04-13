@@ -3,6 +3,7 @@ import { BridgeStatus, captureExternalTask } from '../apiBridge'
 
 interface Props {
   bridgeStatus: BridgeStatus
+  onGoogleCalendarSync: (calendarUrl?: string) => Promise<number>
 }
 
 const statusText: Record<BridgeStatus, string> = {
@@ -17,8 +18,10 @@ const statusClass: Record<BridgeStatus, string> = {
   offline: 'bg-gray-50 text-gray-500 border-gray-200',
 }
 
-export const IntegrationHub: React.FC<Props> = ({ bridgeStatus }) => {
+export const IntegrationHub: React.FC<Props> = ({ bridgeStatus, onGoogleCalendarSync }) => {
   const [testText, setTestText] = React.useState('מחר לקנות חלב לילדים, שנינו, בינוני')
+  const [calendarUrl, setCalendarUrl] = React.useState('')
+  const [syncingCalendar, setSyncingCalendar] = React.useState(false)
   const [message, setMessage] = React.useState('')
 
   React.useEffect(() => {
@@ -33,6 +36,18 @@ export const IntegrationHub: React.FC<Props> = ({ bridgeStatus }) => {
       setMessage('נשלח לגשר. מאנדי ימשוך את זה כמשימה חכמה בעוד רגע.')
     } catch {
       setMessage('הגשר לא מחובר כרגע. הפעילו npm run bridge בחלון נפרד.')
+    }
+  }
+
+  const syncCalendar = async () => {
+    setSyncingCalendar(true)
+    try {
+      const added = await onGoogleCalendarSync(calendarUrl)
+      setMessage(added > 0 ? `יובאו ${added} אירועים מיומן Google כמשימות.` : 'היומן הסתנכרן, לא נמצאו משימות חדשות.')
+    } catch {
+      setMessage('לא הצלחתי לסנכרן את Google Calendar. בדקו GOOGLE_CALENDAR_ICS_URL בוורסל או הדביקו קישור ICS פרטי.')
+    } finally {
+      setSyncingCalendar(false)
     }
   }
 
@@ -75,7 +90,7 @@ export const IntegrationHub: React.FC<Props> = ({ bridgeStatus }) => {
         <div className="border border-gray-200 rounded p-3 bg-gray-50">
           <div className="text-xs font-bold text-gray-700">Google Calendar</div>
           <p className="text-xs text-gray-500 leading-5 mt-2">
-            בתצוגת שבוע אפשר לפתוח משימה כאירוע Google או לייצא את כל השבוע כקובץ ICS.
+            בתצוגת שבוע אפשר לפתוח משימה כאירוע Google, לייצא ICS, וגם לייבא אירועים מהיומן כמשימות.
           </p>
         </div>
       </div>
@@ -94,6 +109,30 @@ export const IntegrationHub: React.FC<Props> = ({ bridgeStatus }) => {
         >
           בדיקת חיבור
         </button>
+      </div>
+
+      <div className="mt-4 border-t border-gray-200 pt-4">
+        <div className="text-xs font-bold text-gray-700 mb-2">סנכרון Google Calendar לתוך מאנדי</div>
+        <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_150px]">
+          <input
+            value={calendarUrl}
+            onChange={event => setCalendarUrl(event.target.value)}
+            dir="ltr"
+            placeholder="אופציונלי: Private ICS URL, או להשאיר ריק אם הוגדר GOOGLE_CALENDAR_ICS_URL בוורסל"
+            className="rounded border border-gray-200 px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-cyan-300"
+          />
+          <button
+            type="button"
+            onClick={syncCalendar}
+            disabled={syncingCalendar}
+            className="rounded bg-emerald-700 text-white text-xs font-semibold px-3 py-2 hover:bg-emerald-800 disabled:bg-gray-300 transition-colors"
+          >
+            {syncingCalendar ? 'מסנכרן...' : 'ייבא מהיומן'}
+          </button>
+        </div>
+        <p className="text-[11px] text-gray-400 mt-2">
+          לייבוא אוטומטי בפריסה: הגדירו ב־Vercel את המשתנה GOOGLE_CALENDAR_ICS_URL עם כתובת ה־Secret iCal של היומן.
+        </p>
       </div>
 
       {message && (
