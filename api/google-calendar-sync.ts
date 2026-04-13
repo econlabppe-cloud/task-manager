@@ -11,6 +11,7 @@ const TOKEN_COOKIE = 'mandy_google_calendar_token'
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const GOOGLE_EVENTS_URL = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
 declare const Buffer: any
+declare const process: { env: Record<string, string | undefined> }
 
 interface GoogleToken {
   access_token: string

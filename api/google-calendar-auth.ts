@@ -3,6 +3,7 @@ const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 const SCOPES = ['https://www.googleapis.com/auth/calendar.events']
 declare const Buffer: any
+declare const process: { env: Record<string, string | undefined> }
 
 function json(status: number, body: unknown, headers: HeadersInit = {}) {
   return Response.json(body, {
