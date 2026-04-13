@@ -9,6 +9,8 @@ import { createRecurringTask, materializeRecurringTasks } from './recurringTasks
 import { requestNotificationPermission, checkDueTasks } from './notifications'
 import { useBridgeSync } from './hooks/useBridgeSync'
 import { useGoogleCalendarSync } from './hooks/useGoogleCalendarSync'
+import { useConfetti, ConfettiOverlay } from './hooks/useConfetti'
+import { useStreak } from './hooks/useStreak'
 import { GROUP_COLORS } from './constants'
 import { Header } from './components/Header'
 import { StatsBar } from './components/StatsBar'
@@ -22,6 +24,7 @@ import { CalendarView } from './components/CalendarView'
 import { AnalyticsPanel } from './components/AnalyticsPanel'
 import { ExportImport } from './components/ExportImport'
 import { MobileBottomNav } from './components/MobileBottomNav'
+import { AIFocusSuggest } from './components/AIFocusSuggest'
 
 function genId(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
@@ -35,6 +38,24 @@ export default function App() {
   // Custom hooks encapsulate bridge polling and Google Calendar sync
   const bridgeStatus = useBridgeSync(setState)
   const syncGoogleCalendar = useGoogleCalendarSync(setState)
+
+  // Confetti
+  const [confettiParticles, fireConfetti] = useConfetti()
+
+  const handleTaskComplete = React.useCallback((_taskId: string, originX: number) => {
+    fireConfetti(originX)
+  }, [fireConfetti])
+
+  // Streak + completed today
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const completedToday = React.useMemo(
+    () => state.groups.flatMap(g => g.tasks).filter(t =>
+      t.status === 'הושלם' && t.completedAt?.startsWith(todayStr)
+    ).length,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [state.groups, todayStr],
+  )
+  const streakData = useStreak(completedToday)
 
   // ── Dark mode ────────────────────────────────────────────────────
   React.useEffect(() => {
@@ -207,7 +228,7 @@ export default function App() {
         </div>
       )}
 
-      <StatsBar groups={state.groups} darkMode={dm} />
+      <StatsBar groups={state.groups} darkMode={dm} streak={streakData.currentStreak} completedToday={completedToday} />
       <FilterBar
         filterAssignee={state.filterAssignee}
         filterStatus={state.filterStatus}
@@ -246,6 +267,7 @@ export default function App() {
           {showTools && (
             <div id="tools-panel" className="mt-3 space-y-3 pb-3">
               <SmartCapture groups={state.groups} onAddTask={addTask} />
+              <AIFocusSuggest groups={state.groups} darkMode={dm} />
               <SmartFocus groups={state.groups} onUpdateTask={updateTask} />
               <RecurringRoutines
                 groups={state.groups}
@@ -302,6 +324,7 @@ export default function App() {
                       onRenameGroup={renameGroup}
                       onReorderTasks={reorderTasks}
                       onCreateTag={createTag}
+                      onTaskComplete={handleTaskComplete}
                     />
                   ))}
               </div>
@@ -328,6 +351,8 @@ export default function App() {
         onToolsToggle={() => setShowTools(open => !open)}
         darkMode={dm}
       />
+
+      <ConfettiOverlay particles={confettiParticles} />
     </div>
   )
 }

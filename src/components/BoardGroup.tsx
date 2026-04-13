@@ -19,6 +19,7 @@ interface Props {
   onRenameGroup: (id: string, title: string) => void
   onReorderTasks: (groupId: string, tasks: Task[]) => void
   onCreateTag?: (tag: Tag) => void
+  onTaskComplete?: (taskId: string, originX: number) => void
 }
 
 const colorMap: Record<string, { bg: string; text: string; border: string; dot: string; header: string; darkHeader: string; darkText: string }> = {
@@ -46,7 +47,7 @@ const COLUMN_HEADERS = [
 export const BoardGroup: React.FC<Props> = ({
   group, filterAssignee, filterStatus, filterTag, searchQuery, allTags, darkMode,
   onToggleCollapse, onUpdateTask, onDeleteTask, onAddTask, onDeleteGroup, onRenameGroup,
-  onReorderTasks, onCreateTag,
+  onReorderTasks, onCreateTag, onTaskComplete,
 }) => {
   const colors = colorMap[group.color] ?? colorMap.indigo
   const [editingTitle, setEditingTitle] = React.useState(false)
@@ -211,6 +212,7 @@ export const BoardGroup: React.FC<Props> = ({
                   onDragStart={handleDragStart}
                   onDragOver={handleDragOver}
                   onDragEnd={handleDragEnd}
+                  onComplete={onTaskComplete}
                 />
               </div>
             ))
