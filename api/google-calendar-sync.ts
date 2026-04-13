@@ -1,5 +1,10 @@
-function sendJson(response: any, status: number, body: unknown) {
-  response.status(status).json(body)
+function json(status: number, body: unknown) {
+  return Response.json(body, {
+    status,
+    headers: {
+      'Cache-Control': 'no-store',
+    },
+  })
 }
 
 function unfoldIcs(raw: string) {
@@ -72,43 +77,41 @@ function parseEvents(rawIcs: string) {
     .slice(0, 100)
 }
 
-export default async function handler(request: any, response: any) {
-  response.setHeader('Cache-Control', 'no-store')
-
-  if (request.method !== 'GET') {
-    sendJson(response, 405, { ok: false, error: 'method_not_allowed' })
-    return
-  }
-
-  const calendarUrl = request.query?.url || process.env.GOOGLE_CALENDAR_ICS_URL
-  if (!calendarUrl || !/^https:\/\/.+/i.test(String(calendarUrl))) {
-    sendJson(response, 400, {
-      ok: false,
-      error: 'missing_calendar_url',
-      message: 'Set GOOGLE_CALENDAR_ICS_URL in Vercel, or pass ?url=https://...',
-    })
-    return
-  }
-
-  try {
-    const calendarResponse = await fetch(String(calendarUrl), {
-      headers: { 'User-Agent': 'MandyHome/1.0' },
-    })
-
-    if (!calendarResponse.ok) {
-      sendJson(response, calendarResponse.status, {
-        ok: false,
-        error: 'calendar_fetch_failed',
-      })
-      return
+export default {
+  async fetch(request: Request) {
+    if (request.method !== 'GET') {
+      return json(405, { ok: false, error: 'method_not_allowed' })
     }
 
-    sendJson(response, 200, {
-      ok: true,
-      events: parseEvents(await calendarResponse.text()),
-      syncedAt: new Date().toISOString(),
-    })
-  } catch {
-    sendJson(response, 500, { ok: false, error: 'calendar_sync_failed' })
-  }
+    const url = new URL(request.url)
+    const calendarUrl = url.searchParams.get('url') || process.env.GOOGLE_CALENDAR_ICS_URL
+    if (!calendarUrl || !/^https:\/\/.+/i.test(String(calendarUrl))) {
+      return json(400, {
+        ok: false,
+        error: 'missing_calendar_url',
+        message: 'Set GOOGLE_CALENDAR_ICS_URL in Vercel, or pass ?url=https://...',
+      })
+    }
+
+    try {
+      const calendarResponse = await fetch(String(calendarUrl), {
+        headers: { 'User-Agent': 'MandyHome/1.0' },
+      })
+
+      if (!calendarResponse.ok) {
+        return json(calendarResponse.status, {
+          ok: false,
+          error: 'calendar_fetch_failed',
+        })
+      }
+
+      return json(200, {
+        ok: true,
+        events: parseEvents(await calendarResponse.text()),
+        syncedAt: new Date().toISOString(),
+      })
+    } catch {
+      return json(500, { ok: false, error: 'calendar_sync_failed' })
+    }
+  },
 }
