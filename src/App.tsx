@@ -10,7 +10,7 @@ import { requestNotificationPermission, checkDueTasks } from './notifications'
 import { parseSmartTask } from './taskIntelligence'
 import { ackBridgeCapture, checkBridgeHealth, fetchBridgeInbox } from './apiBridge'
 import type { BridgeCapture, BridgeStatus } from './apiBridge'
-import { fetchGoogleCalendarTasks, googleEventToTaskDefaults, syncGoogleCalendarBidirectional } from './googleCalendarSync'
+import { fetchGoogleCalendarAuthStatus, fetchGoogleCalendarTasks, googleEventToTaskDefaults, syncGoogleCalendarBidirectional } from './googleCalendarSync'
 import { Header } from './components/Header'
 import { StatsBar } from './components/StatsBar'
 import { FilterBar } from './components/FilterBar'
@@ -45,6 +45,9 @@ export default function App() {
   const [state, setState] = React.useState<BoardState>(() => loadState())
   const [showTools, setShowTools] = React.useState(false)
   const [bridgeStatus, setBridgeStatus] = React.useState<BridgeStatus>('checking')
+  const [googleAuthUrl, setGoogleAuthUrl] = React.useState('')
+  const [calendarQuickMessage, setCalendarQuickMessage] = React.useState('')
+  const [quickCalendarSyncing, setQuickCalendarSyncing] = React.useState(false)
   const processedCaptureIdsRef = React.useRef<Set<string>>(loadProcessedCaptureIds())
 
   // ── Dark mode ────────────────────────────────────────────────────
@@ -63,6 +66,18 @@ export default function App() {
     return () => clearTimeout(t)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  React.useEffect(() => {
+    void fetchGoogleCalendarAuthStatus()
+      .then(status => setGoogleAuthUrl(status.authUrl ?? ''))
+      .catch(() => setGoogleAuthUrl(''))
+  }, [])
+
+  React.useEffect(() => {
+    if (!calendarQuickMessage) return
+    const timeoutId = window.setTimeout(() => setCalendarQuickMessage(''), 3500)
+    return () => window.clearTimeout(timeoutId)
+  }, [calendarQuickMessage])
 
   // ── Global shortcut Ctrl+K ───────────────────────────────────────
   React.useEffect(() => {
@@ -280,6 +295,18 @@ export default function App() {
     return addedCount
   }
 
+  const quickSyncGoogleCalendar = async () => {
+    setQuickCalendarSyncing(true)
+    try {
+      const added = await syncGoogleCalendar()
+      setCalendarQuickMessage(added > 0 ? `יובאו ${added} אירועים חדשים מהיומן.` : 'היומן סונכרן.')
+    } catch {
+      setCalendarQuickMessage('צריך לחבר יומן Google לפני סנכרון דו־כיווני.')
+    } finally {
+      setQuickCalendarSyncing(false)
+    }
+  }
+
   React.useEffect(() => {
     void syncGoogleCalendar().catch(() => {
       // Calendar sync is optional until GOOGLE_CALENDAR_ICS_URL is configured.
@@ -318,15 +345,39 @@ export default function App() {
       {/* Tools strip */}
       <div className={`border-b ${toolsBg}`}>
         <div className="max-w-6xl mx-auto px-4 py-2">
-          <button
-            onClick={() => setShowTools(t => !t)}
-            className={`flex items-center gap-1.5 text-xs font-medium ${dm ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'} transition-colors`}
-          >
-            <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${showTools ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-            <span>כלים • Ctrl+K לאיסוף מהיר</span>
-          </button>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <button
+              onClick={() => setShowTools(t => !t)}
+              className={`flex items-center gap-1.5 text-xs font-medium ${dm ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'} transition-colors`}
+            >
+              <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${showTools ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+              <span>כלים • Ctrl+K לאיסוף מהיר</span>
+            </button>
+
+            <div className="flex items-center gap-2">
+              {calendarQuickMessage && (
+                <span className={`text-[11px] font-medium ${dm ? 'text-cyan-200' : 'text-cyan-700'}`}>
+                  {calendarQuickMessage}
+                </span>
+              )}
+              <a
+                href={googleAuthUrl || undefined}
+                className={`rounded px-3 py-1.5 text-xs font-semibold transition-colors ${googleAuthUrl ? 'bg-sky-700 text-white hover:bg-sky-800' : 'bg-gray-200 text-gray-400 pointer-events-none'}`}
+              >
+                חבר יומן
+              </a>
+              <button
+                type="button"
+                onClick={quickSyncGoogleCalendar}
+                disabled={quickCalendarSyncing}
+                className="rounded bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 hover:bg-emerald-800 disabled:bg-gray-300 transition-colors"
+              >
+                {quickCalendarSyncing ? 'מסנכרן...' : 'סנכרן יומן'}
+              </button>
+            </div>
+          </div>
 
           {showTools && (
             <div className="mt-3 space-y-3 pb-3">
