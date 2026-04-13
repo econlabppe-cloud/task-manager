@@ -9,6 +9,8 @@ import { TagBadge } from './TagBadge'
 import { TagPicker } from './TagPicker'
 import { RecurringBadge } from './RecurringBadge'
 
+const REACTION_EMOJIS = ['⭐', '🙏', '👏', '💪', '❤️']
+
 interface Props {
   task: Task
   groupColor: string
@@ -21,6 +23,7 @@ interface Props {
   onDragStart?: (taskId: string) => void
   onDragOver?: (taskId: string) => void
   onDragEnd?: () => void
+  onComplete?: (taskId: string, originX: number) => void
 }
 
 const colorBorder: Record<string, string> = {
@@ -37,10 +40,13 @@ const colorBorder: Record<string, string> = {
 export const TaskRow: React.FC<Props> = ({
   task, groupColor, index, allTags, darkMode,
   onUpdate, onDelete, onCreateTag,
-  onDragStart, onDragOver, onDragEnd,
+  onDragStart, onDragOver, onDragEnd, onComplete,
 }) => {
   const [expanded, setExpanded] = React.useState(false)
   const [dragging, setDragging] = React.useState(false)
+  const [showReactions, setShowReactions] = React.useState(false)
+  const [justDone, setJustDone] = React.useState(false)
+  const checkboxRef = React.useRef<HTMLButtonElement>(null)
   const borderClass = colorBorder[groupColor] ?? 'border-gray-400'
 
   const rowBg = darkMode
@@ -98,16 +104,30 @@ export const TaskRow: React.FC<Props> = ({
         {/* Checkbox */}
         <div className="w-7 flex justify-center items-center self-center shrink-0">
           <button
-            onClick={() => onUpdate(task.id, { status: task.status === 'הושלם' ? 'לא התחיל' : 'הושלם' })}
-            className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+            ref={checkboxRef}
+            onClick={() => {
+              const completing = task.status !== 'הושלם'
+              onUpdate(task.id, {
+                status: completing ? 'הושלם' : 'לא התחיל',
+                completedAt: completing ? new Date().toISOString() : undefined,
+              })
+              if (completing) {
+                setJustDone(true)
+                setTimeout(() => setJustDone(false), 600)
+                const rect = checkboxRef.current?.getBoundingClientRect()
+                onComplete?.(task.id, rect ? rect.left + rect.width / 2 : window.innerWidth / 2)
+              }
+            }}
+            className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${justDone ? 'task-done-flash' : ''} ${
               task.status === 'הושלם'
                 ? 'bg-green-500 border-green-500'
                 : darkMode ? 'border-gray-500 hover:border-green-400' : 'border-gray-300 hover:border-green-400'
             }`}
+            aria-label={task.status === 'הושלם' ? 'סמן כלא הושלם' : 'סמן כהושלם'}
             title={task.status === 'הושלם' ? 'סמן כלא הושלם' : 'סמן כהושלם'}
           >
             {task.status === 'הושלם' && (
-              <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
               </svg>
             )}
@@ -244,14 +264,75 @@ export const TaskRow: React.FC<Props> = ({
           />
         </div>
 
+        {/* Reactions */}
+        <div className="flex items-center self-center shrink-0 opacity-0 group-hover:opacity-100 transition-opacity relative">
+          {/* Existing reaction counts */}
+          {Object.entries(task.reactions ?? {}).filter(([, count]) => count > 0).map(([emoji, count]) => (
+            <button
+              key={emoji}
+              onClick={() => {
+                const current = task.reactions ?? {}
+                const newCount = Math.max(0, (current[emoji] ?? 0) - 1)
+                onUpdate(task.id, { reactions: { ...current, [emoji]: newCount } })
+              }}
+              title={`${count} × ${emoji} — לחץ להסרה`}
+              className="flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded-full bg-amber-50 border border-amber-200 hover:bg-amber-100 mr-0.5"
+            >
+              <span>{emoji}</span>
+              <span className="text-amber-700 font-medium">{count}</span>
+            </button>
+          ))}
+
+          {/* Add reaction */}
+          <div className="relative">
+            <button
+              onClick={() => setShowReactions(r => !r)}
+              title="הוסף תגובה"
+              aria-label="הוסף תגובה אמוג'י"
+              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs border transition-colors ${
+                darkMode
+                  ? 'border-gray-600 text-gray-400 hover:bg-gray-700'
+                  : 'border-gray-200 text-gray-400 hover:bg-gray-100'
+              }`}
+            >
+              +
+            </button>
+            {showReactions && (
+              <div
+                className={`absolute bottom-full mb-1 left-0 flex gap-1 p-1.5 rounded-xl border shadow-lg z-20 ${
+                  darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+                }`}
+                onMouseLeave={() => setShowReactions(false)}
+              >
+                {REACTION_EMOJIS.map(emoji => (
+                  <button
+                    key={emoji}
+                    onClick={() => {
+                      const current = task.reactions ?? {}
+                      onUpdate(task.id, { reactions: { ...current, [emoji]: (current[emoji] ?? 0) + 1 } })
+                      setShowReactions(false)
+                    }}
+                    className="text-lg hover:scale-125 transition-transform px-0.5"
+                    title={emoji}
+                    aria-label={`תגיב ${emoji}`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Delete */}
         <div className="w-8 flex justify-center items-center self-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
           <button
             onClick={() => onDelete(task.id)}
             className="w-5 h-5 rounded flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+            aria-label={`מחק משימה: ${task.title}`}
             title="מחק משימה"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>

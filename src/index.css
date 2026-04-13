@@ -44,3 +44,20 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   outline: 2px solid #6366f1;
   outline-offset: 1px;
 }
+
+/* Confetti animation */
+@keyframes confetti-fall {
+  0%   { transform: translateY(0)     rotate(0deg)   scale(1); opacity: 1; }
+  60%  { opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg) scale(0.5); opacity: 0; }
+}
+
+/* Task completion pulse */
+@keyframes task-done-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+  70%  { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+.task-done-flash {
+  animation: task-done-pulse 0.5s ease-out;
+}

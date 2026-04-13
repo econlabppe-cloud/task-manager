@@ -36,6 +36,9 @@ export interface Task {
   externalId?: string
   externalUpdatedAt?: string
   order: number
+  // v3 additions
+  reactions?: Record<string, number>  // emoji → reaction count
+  completedAt?: string                // ISO timestamp when status became 'הושלם'
 }
 
 export type NewTaskDefaults = Partial<Omit<Task, 'id' | 'title' | 'createdAt' | 'subtasks' | 'tags' | 'order'>>

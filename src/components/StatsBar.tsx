@@ -4,9 +4,11 @@ import { Group } from '../types'
 interface Props {
   groups: Group[]
   darkMode?: boolean
+  streak?: number
+  completedToday?: number
 }
 
-export const StatsBar: React.FC<Props> = ({ groups, darkMode }) => {
+export const StatsBar: React.FC<Props> = ({ groups, darkMode, streak = 0, completedToday = 0 }) => {
   const allTasks = groups.flatMap(g => g.tasks)
   const total = allTasks.length
   const done = allTasks.filter(t => t.status === 'הושלם').length
@@ -77,6 +79,34 @@ export const StatsBar: React.FC<Props> = ({ groups, darkMode }) => {
           </div>
           <span className={`font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'} whitespace-nowrap`}>{pct}%</span>
         </div>
+
+        {completedToday > 0 && (
+          <>
+            {divider}
+            <div className="flex items-center gap-1.5" title={`${completedToday} משימות הושלמו היום`}>
+              <span className="text-green-500 text-sm">✓</span>
+              <span className={textMuted}>היום</span>
+              <span className="font-bold text-green-600">{completedToday}</span>
+            </div>
+          </>
+        )}
+
+        {streak > 0 && (
+          <>
+            {divider}
+            <div
+              className="flex items-center gap-1"
+              title={`${streak} ימים ברצף עם לפחות משימה אחת שהושלמה`}
+              aria-label={`רצף של ${streak} ימים`}
+            >
+              <span className="text-lg leading-none">🔥</span>
+              <span className={`font-bold ${streak >= 7 ? 'text-orange-500' : streak >= 3 ? 'text-amber-500' : textMuted}`}>
+                {streak}
+              </span>
+              <span className={`${textMuted} hidden sm:inline`}>ימים ברצף</span>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

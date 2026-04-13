@@ -19,6 +19,7 @@ interface Props {
   onRenameGroup: (id: string, title: string) => void
   onReorderTasks: (groupId: string, tasks: Task[]) => void
   onCreateTag?: (tag: Tag) => void
+  onTaskComplete?: (taskId: string, originX: number) => void
 }
 
 const colorMap: Record<string, { bg: string; text: string; border: string; dot: string; header: string; darkHeader: string; darkText: string }> = {
@@ -46,7 +47,7 @@ const COLUMN_HEADERS = [
 export const BoardGroup: React.FC<Props> = ({
   group, filterAssignee, filterStatus, filterTag, searchQuery, allTags, darkMode,
   onToggleCollapse, onUpdateTask, onDeleteTask, onAddTask, onDeleteGroup, onRenameGroup,
-  onReorderTasks, onCreateTag,
+  onReorderTasks, onCreateTag, onTaskComplete,
 }) => {
   const colors = colorMap[group.color] ?? colorMap.indigo
   const [editingTitle, setEditingTitle] = React.useState(false)
@@ -103,14 +104,17 @@ export const BoardGroup: React.FC<Props> = ({
   const bodyBg = darkMode ? 'bg-gray-800/50 border-gray-700' : 'bg-gray-50 border-gray-100'
 
   return (
-    <div className="mb-5">
+    <article aria-label={`קבוצת משימות: ${group.title}`} className="mb-5" role="listitem">
       {/* Group Header */}
       <div className={`flex items-center gap-2 px-3 py-2 rounded-t-lg ${headerBg} border-b ${darkMode ? 'border-gray-700' : colors.border}`}>
         <button
           onClick={() => onToggleCollapse(group.id)}
+          aria-expanded={!group.collapsed}
+          aria-controls={`group-body-${group.id}`}
+          aria-label={group.collapsed ? `הרחב קבוצה: ${group.title}` : `כווץ קבוצה: ${group.title}`}
           className={`w-5 h-5 flex items-center justify-center rounded hover:bg-white/20 transition-transform duration-200 ${group.collapsed ? '-rotate-90' : ''}`}
         >
-          <svg className={`w-3.5 h-3.5 ${headerText}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className={`w-3.5 h-3.5 ${headerText}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
           </svg>
         </button>
@@ -151,18 +155,19 @@ export const BoardGroup: React.FC<Props> = ({
         <div className="flex-1" />
 
         {confirmDelete ? (
-          <div className="flex items-center gap-1 text-xs">
+          <div className="flex items-center gap-1 text-xs" role="alertdialog" aria-label={`אישור מחיקת קבוצה ${group.title}`}>
             <span className="text-red-500 font-medium">מחק?</span>
-            <button onClick={() => onDeleteGroup(group.id)} className="text-red-500 hover:text-red-700 font-semibold px-1">כן</button>
-            <button onClick={() => setConfirmDelete(false)} className={`px-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>לא</button>
+            <button onClick={() => onDeleteGroup(group.id)} aria-label="אשר מחיקה" className="text-red-500 hover:text-red-700 font-semibold px-1">כן</button>
+            <button onClick={() => setConfirmDelete(false)} aria-label="בטל מחיקה" className={`px-1 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>לא</button>
           </div>
         ) : (
           <button
             onClick={() => setConfirmDelete(true)}
+            aria-label={`מחק קבוצה ${group.title}`}
             className={`${headerText} opacity-30 hover:opacity-70 transition-opacity`}
             title="מחק קבוצה"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
           </button>
@@ -171,7 +176,7 @@ export const BoardGroup: React.FC<Props> = ({
 
       {/* Body */}
       {!group.collapsed && (
-        <div className={`border-x border-b rounded-b-lg ${bodyBg}`}>
+        <div id={`group-body-${group.id}`} className={`border-x border-b rounded-b-lg ${bodyBg}`}>
           {/* Column headers */}
           <div className={`flex items-center px-1 py-1.5 border-b ${darkMode ? 'border-gray-700' : 'border-gray-200'}`}>
             <div className={`w-1 self-stretch border-r-2 ${colors.border} opacity-20`} />
@@ -207,6 +212,7 @@ export const BoardGroup: React.FC<Props> = ({
                   onDragStart={handleDragStart}
                   onDragOver={handleDragOver}
                   onDragEnd={handleDragEnd}
+                  onComplete={onTaskComplete}
                 />
               </div>
             ))
@@ -221,15 +227,16 @@ export const BoardGroup: React.FC<Props> = ({
       )}
 
       {group.collapsed && (
-        <div
-          className={`flex items-center gap-2 px-4 py-2 border border-t-0 rounded-b-lg cursor-pointer transition-colors ${darkMode ? 'bg-gray-800 border-gray-700 hover:bg-gray-700' : 'bg-white border-gray-100 hover:bg-gray-50'}`}
+        <button
+          className={`w-full flex items-center gap-2 px-4 py-2 border border-t-0 rounded-b-lg cursor-pointer transition-colors ${darkMode ? 'bg-gray-800 border-gray-700 hover:bg-gray-700' : 'bg-white border-gray-100 hover:bg-gray-50'}`}
           onClick={() => onToggleCollapse(group.id)}
+          aria-label={`הרחב קבוצה ${group.title}: ${filteredTasks.length} משימות, ${doneCount} הושלמו`}
         >
           <span className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-400'}`}>
             {filteredTasks.length} משימות • {doneCount} הושלמו
           </span>
-        </div>
+        </button>
       )}
-    </div>
+    </article>
   )
 }

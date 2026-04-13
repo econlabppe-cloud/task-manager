@@ -69,13 +69,15 @@ export const Header: React.FC<Props> = ({
       <div className={`w-px h-6 ${darkMode ? 'bg-gray-700' : 'bg-gray-200'} mx-1 hidden sm:block`} />
 
       {/* View switcher */}
-      <nav className="flex items-center gap-1 bg-transparent">
+      <nav aria-label="מצב תצוגה" className="flex items-center gap-1 bg-transparent">
         {VIEWS.map(({ mode, label, icon }) => {
           const isActive = viewMode === mode
           return (
             <button
               key={mode}
               onClick={() => onViewChange(mode)}
+              aria-current={isActive ? 'page' : undefined}
+              aria-label={label}
               className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors ${
                 isActive
                   ? darkMode
@@ -86,7 +88,7 @@ export const Header: React.FC<Props> = ({
                     : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'
               }`}
             >
-              {icon}
+              <span aria-hidden="true">{icon}</span>
               <span className="hidden sm:block">{label}</span>
             </button>
           )
@@ -119,6 +121,7 @@ export const Header: React.FC<Props> = ({
         {/* Dark mode toggle */}
         <button
           onClick={onDarkModeToggle}
+          aria-label={darkMode ? 'עבור למצב בהיר' : 'עבור למצב כהה'}
           className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
             darkMode ? 'bg-gray-800 text-yellow-400 hover:bg-gray-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
           }`}

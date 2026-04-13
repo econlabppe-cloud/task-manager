@@ -10,29 +10,51 @@ const PORT = Number(process.env.MANDY_BRIDGE_PORT ?? 8787)
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN ?? 'mandy-local-verify-token'
 const GRAPH_VERSION = process.env.WHATSAPP_GRAPH_VERSION ?? 'v24.0'
 
-function sendJson(res, status, body) {
-  res.writeHead(status, {
-    'Content-Type': 'application/json; charset=utf-8',
-    'Access-Control-Allow-Origin': '*',
+// Restrict CORS to localhost origins only — the bridge is a local service.
+const ALLOWED_ORIGINS = new Set([
+  `http://localhost:${PORT}`,
+  'http://localhost:5173',
+  'http://localhost:4173',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:4173',
+])
+const MAX_BODY_BYTES = 64 * 1024 // 64 KB — enough for any task payload
+
+function corsHeaders(req) {
+  const origin = req.headers['origin'] ?? ''
+  const allowedOrigin = ALLOWED_ORIGINS.has(origin) ? origin : 'null'
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
+    'Vary': 'Origin',
+  }
+}
+
+function sendJson(res, req, status, body) {
+  res.writeHead(status, {
+    'Content-Type': 'application/json; charset=utf-8',
+    ...corsHeaders(req),
   })
   res.end(JSON.stringify(body))
 }
 
-function sendText(res, status, body) {
+function sendText(res, req, status, body) {
   res.writeHead(status, {
     'Content-Type': 'text/plain; charset=utf-8',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    ...corsHeaders(req),
   })
   res.end(body)
 }
 
 async function readBody(req) {
   const chunks = []
-  for await (const chunk of req) chunks.push(chunk)
+  let totalBytes = 0
+  for await (const chunk of req) {
+    totalBytes += chunk.length
+    if (totalBytes > MAX_BODY_BYTES) throw new Error('Request body too large')
+    chunks.push(chunk)
+  }
   const raw = Buffer.concat(chunks).toString('utf8')
   if (!raw) return {}
   return JSON.parse(raw)
@@ -141,11 +163,11 @@ async function handleWhatsAppGet(req, res) {
   const challenge = url.searchParams.get('hub.challenge')
 
   if (mode === 'subscribe' && token === VERIFY_TOKEN && challenge) {
-    sendText(res, 200, challenge)
+    sendText(res, req, 200, challenge)
     return
   }
 
-  sendText(res, 403, 'Forbidden')
+  sendText(res, req, 403, 'Forbidden')
 }
 
 async function handleWhatsAppPost(req, res) {
@@ -164,46 +186,47 @@ async function handleWhatsAppPost(req, res) {
     await sendWhatsAppReply(message.from, `קיבלתי לצ'ק ליסט בית: ${message.text}`)
   }
 
-  sendJson(res, 200, { ok: true, captured: captured.length })
+  sendJson(res, req, 200, { ok: true, captured: captured.length })
 }
 
 async function route(req, res) {
   try {
     if (req.method === 'OPTIONS') {
-      sendText(res, 204, '')
+      sendText(res, req, 204, '')
       return
     }
 
     const url = new URL(req.url, `http://${req.headers.host}`)
 
     if (req.method === 'GET' && url.pathname === '/api/bridge/health') {
-      sendJson(res, 200, { ok: true, service: 'mandy-bridge', now: new Date().toISOString() })
+      sendJson(res, req, 200, { ok: true, service: 'mandy-bridge', now: new Date().toISOString() })
       return
     }
 
     if (req.method === 'GET' && url.pathname === '/api/bridge/inbox') {
-      sendJson(res, 200, { items: await readInbox() })
+      sendJson(res, req, 200, { items: await readInbox() })
       return
     }
 
     if (req.method === 'POST' && url.pathname === '/api/bridge/capture') {
       const body = await readBody(req)
+      const rawText = String(body.text ?? '').slice(0, 2000)
       const item = await addCapture({
-        text: body.text,
+        text: rawText,
         source: body.source ?? 'api',
         from: body.from,
       })
       if (!item) {
-        sendJson(res, 400, { ok: false, error: 'text is required' })
+        sendJson(res, req, 400, { ok: false, error: 'text is required' })
         return
       }
-      sendJson(res, 201, { ok: true, item })
+      sendJson(res, req, 201, { ok: true, item })
       return
     }
 
     if (req.method === 'DELETE' && url.pathname.startsWith('/api/bridge/inbox/')) {
       const id = decodeURIComponent(url.pathname.replace('/api/bridge/inbox/', ''))
-      sendJson(res, 200, { ok: true, removed: await removeCapture(id) })
+      sendJson(res, req, 200, { ok: true, removed: await removeCapture(id) })
       return
     }
 
@@ -217,10 +240,10 @@ async function route(req, res) {
       return
     }
 
-    sendJson(res, 404, { ok: false, error: 'not found' })
+    sendJson(res, req, 404, { ok: false, error: 'not found' })
   } catch (error) {
     console.error(error)
-    sendJson(res, 500, { ok: false, error: 'internal error' })
+    sendJson(res, req, 500, { ok: false, error: 'internal error' })
   }
 }
 

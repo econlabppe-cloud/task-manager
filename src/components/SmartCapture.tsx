@@ -1,6 +1,7 @@
 import React from 'react'
 import { Group, NewTaskDefaults, Priority } from '../types'
 import { formatDateLabel, parseSmartTask } from '../taskIntelligence'
+import { useDebounce } from '../hooks/useDebounce'
 
 type CaptureSource = 'typing' | 'voice'
 
@@ -64,7 +65,9 @@ export const SmartCapture: React.FC<Props> = ({ groups, onAddTask }) => {
     return window.SpeechRecognition ?? window.webkitSpeechRecognition
   }, [])
 
-  const draft = React.useMemo(() => parseSmartTask(text, groups), [groups, text])
+  // Debounce the heavy smart-parse call so it doesn't run on every keystroke
+  const debouncedText = useDebounce(text, 150)
+  const draft = React.useMemo(() => parseSmartTask(debouncedText, groups), [groups, debouncedText])
   const canAdd = text.trim().length > 0 && draft.groupId.length > 0
 
   React.useEffect(() => {
@@ -141,10 +144,10 @@ export const SmartCapture: React.FC<Props> = ({ groups, onAddTask }) => {
   }
 
   return (
-    <section className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+    <section aria-labelledby="smart-capture-title" className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="text-base font-bold text-gray-900">איסוף מהיר</h2>
+          <h2 id="smart-capture-title" className="text-base font-bold text-gray-900">איסוף מהיר</h2>
           <p className="text-xs text-gray-500 mt-1">
             אפשר להגיד או לכתוב: "מחר לקנות חלב, ליהודה, דחוף"
           </p>
@@ -155,6 +158,8 @@ export const SmartCapture: React.FC<Props> = ({ groups, onAddTask }) => {
             type="button"
             onClick={listening ? stopListening : startListening}
             disabled={!recognitionConstructor}
+            aria-pressed={listening}
+            aria-label={listening ? 'עצור הקלטה' : 'הקלט משימה בקול'}
             className={`flex items-center gap-1.5 px-3 py-2 rounded text-xs font-semibold border transition-colors ${
               listening
                 ? 'bg-red-50 text-red-700 border-red-200'
@@ -162,7 +167,7 @@ export const SmartCapture: React.FC<Props> = ({ groups, onAddTask }) => {
             }`}
             title={recognitionConstructor ? 'הקלטת משימה' : 'הדפדפן לא תומך בזיהוי דיבור'}
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18.5v3m0 0h3m-3 0H9m7-12V7a4 4 0 00-8 0v2.5a4 4 0 008 0zM5 10a7 7 0 0014 0" />
             </svg>
             {listening ? 'עצור הקלטה' : 'הקלט משימה'}
@@ -172,6 +177,7 @@ export const SmartCapture: React.FC<Props> = ({ groups, onAddTask }) => {
             type="button"
             onClick={submit}
             disabled={!canAdd}
+            aria-label="הוסף משימה חכמה ללוח"
             className="px-3 py-2 rounded text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 transition-colors"
           >
             הוסף חכם
@@ -181,6 +187,7 @@ export const SmartCapture: React.FC<Props> = ({ groups, onAddTask }) => {
 
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_320px] mt-4">
         <textarea
+          data-smart-capture
           value={text}
           onChange={event => {
             setText(event.target.value)
@@ -189,10 +196,17 @@ export const SmartCapture: React.FC<Props> = ({ groups, onAddTask }) => {
           onKeyDown={handleKeyDown}
           placeholder="לדוגמה: ביום חמישי לתקן את הברז, יהודה, עדיפות גבוהה"
           dir="rtl"
+          aria-label="תיאור המשימה"
+          aria-describedby="smart-capture-hint"
           className="w-full min-h-[88px] rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-cyan-300 focus:bg-white resize-none"
         />
 
-        <div className="border border-gray-200 rounded p-3 bg-gray-50 min-h-[88px]">
+        <div
+          id="smart-capture-hint"
+          className="border border-gray-200 rounded p-3 bg-gray-50 min-h-[88px]"
+          aria-live="polite"
+          aria-atomic="true"
+        >
           <div className="text-xs font-semibold text-gray-500 mb-2">פענוח לפני הוספה</div>
           {text.trim() ? (
             <div className="space-y-2">
