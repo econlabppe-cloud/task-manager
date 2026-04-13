@@ -1,15 +1,12 @@
-function sendJson(response, status, body) {
-  response.statusCode = status
-  response.setHeader('Content-Type', 'application/json; charset=utf-8')
-  response.setHeader('Cache-Control', 'no-store')
-  response.end(JSON.stringify(body))
+function sendJson(response: any, status: number, body: unknown) {
+  response.status(status).json(body)
 }
 
-function unfoldIcs(raw) {
+function unfoldIcs(raw: string) {
   return raw.replace(/\r?\n[ \t]/g, '')
 }
 
-function parseIcsDate(value) {
+function parseIcsDate(value: string) {
   if (!value) return ''
 
   const dateOnly = value.match(/^(\d{4})(\d{2})(\d{2})$/)
@@ -21,7 +18,7 @@ function parseIcsDate(value) {
   return ''
 }
 
-function unescapeIcs(value) {
+function unescapeIcs(value: string) {
   return String(value ?? '')
     .replace(/\\n/g, '\n')
     .replace(/\\,/g, ',')
@@ -30,15 +27,14 @@ function unescapeIcs(value) {
     .trim()
 }
 
-function fieldValue(lines, name) {
-  const prefix = `${name}`
-  const line = lines.find(item => item.startsWith(`${prefix}:`) || item.startsWith(`${prefix};`))
+function fieldValue(lines: string[], name: string) {
+  const line = lines.find(item => item.startsWith(`${name}:`) || item.startsWith(`${name};`))
   if (!line) return ''
   const index = line.indexOf(':')
   return index >= 0 ? line.slice(index + 1) : ''
 }
 
-function parseEvents(rawIcs) {
+function parseEvents(rawIcs: string) {
   const now = new Date()
   now.setHours(0, 0, 0, 0)
   const max = new Date(now)
@@ -76,7 +72,9 @@ function parseEvents(rawIcs) {
     .slice(0, 100)
 }
 
-export default async function handler(request, response) {
+export default async function handler(request: any, response: any) {
+  response.setHeader('Cache-Control', 'no-store')
+
   if (request.method !== 'GET') {
     sendJson(response, 405, { ok: false, error: 'method_not_allowed' })
     return
@@ -105,10 +103,9 @@ export default async function handler(request, response) {
       return
     }
 
-    const ics = await calendarResponse.text()
     sendJson(response, 200, {
       ok: true,
-      events: parseEvents(ics),
+      events: parseEvents(await calendarResponse.text()),
       syncedAt: new Date().toISOString(),
     })
   } catch {
