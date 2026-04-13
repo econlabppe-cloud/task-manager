@@ -1,5 +1,6 @@
 import React from 'react'
 import { BoardState, Group } from '../types'
+import { MAX_TITLE_LENGTH } from '../constants'
 
 interface Props {
   state: BoardState
@@ -66,10 +67,25 @@ export const ExportImport: React.FC<Props> = ({ state, onImport, darkMode }) => 
     const reader = new FileReader()
     reader.onload = (evt) => {
       try {
-        const parsed = JSON.parse(evt.target?.result as string) as BoardState
-        if (!parsed.groups || !Array.isArray(parsed.groups)) {
-          throw new Error('קובץ לא תקני — חסר שדה groups')
+        const raw = evt.target?.result
+        if (typeof raw !== 'string') throw new Error('שגיאה בקריאת הקובץ')
+
+        const parsed = JSON.parse(raw) as BoardState
+
+        // Basic structural validation
+        if (!parsed || typeof parsed !== 'object') throw new Error('קובץ לא תקני — JSON לא תקין')
+        if (!Array.isArray(parsed.groups)) throw new Error('קובץ לא תקני — חסר שדה groups')
+        for (const group of parsed.groups) {
+          if (typeof group.id !== 'string' || !group.id) throw new Error('קובץ לא תקני — קבוצה ללא מזהה')
+          if (typeof group.title !== 'string') throw new Error('קובץ לא תקני — כותרת קבוצה חסרה')
+          if (!Array.isArray(group.tasks)) throw new Error('קובץ לא תקני — tasks אינו מערך')
+          for (const task of group.tasks) {
+            if (typeof task.id !== 'string' || !task.id) throw new Error('קובץ לא תקני — משימה ללא מזהה')
+            if (typeof task.title !== 'string') throw new Error('קובץ לא תקני — כותרת משימה חסרה')
+            if (task.title.length > MAX_TITLE_LENGTH) throw new Error(`כותרת משימה ארוכה מדי (מקסימום ${MAX_TITLE_LENGTH} תווים)`)
+          }
         }
+
         onImport(parsed)
         setImportSuccess(true)
         setTimeout(() => setImportSuccess(false), 3000)

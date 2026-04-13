@@ -7,10 +7,9 @@ import type {
 import { loadState, saveState } from './store'
 import { createRecurringTask, materializeRecurringTasks } from './recurringTasks'
 import { requestNotificationPermission, checkDueTasks } from './notifications'
-import { parseSmartTask } from './taskIntelligence'
-import { ackBridgeCapture, checkBridgeHealth, fetchBridgeInbox } from './apiBridge'
-import type { BridgeCapture, BridgeStatus } from './apiBridge'
-import { fetchGoogleCalendarTasks, googleEventToTaskDefaults, syncGoogleCalendarBidirectional } from './googleCalendarSync'
+import { useBridgeSync } from './hooks/useBridgeSync'
+import { useGoogleCalendarSync } from './hooks/useGoogleCalendarSync'
+import { GROUP_COLORS } from './constants'
 import { Header } from './components/Header'
 import { StatsBar } from './components/StatsBar'
 import { FilterBar } from './components/FilterBar'
@@ -24,28 +23,18 @@ import { AnalyticsPanel } from './components/AnalyticsPanel'
 import { ExportImport } from './components/ExportImport'
 import { MobileBottomNav } from './components/MobileBottomNav'
 
-const GROUP_COLORS = ['purple', 'blue', 'green', 'orange', 'teal', 'red', 'pink', 'indigo']
-const PROCESSED_CAPTURE_KEY = 'mandy-processed-captures-v1'
-const GOOGLE_CALENDAR_GROUP_TITLE = 'יומן גוגל'
-
 function genId(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
-}
-
-function loadProcessedCaptureIds(): Set<string> {
-  try { return new Set(JSON.parse(localStorage.getItem(PROCESSED_CAPTURE_KEY) ?? '[]') as string[]) }
-  catch { return new Set() }
-}
-function saveProcessedCaptureIds(ids: Set<string>): void {
-  try { localStorage.setItem(PROCESSED_CAPTURE_KEY, JSON.stringify(Array.from(ids).slice(-250))) }
-  catch { /* ignore */ }
 }
 
 export default function App() {
   const [state, setState] = React.useState<BoardState>(() => loadState())
   const [showTools, setShowTools] = React.useState(false)
-  const [bridgeStatus, setBridgeStatus] = React.useState<BridgeStatus>('checking')
-  const processedCaptureIdsRef = React.useRef<Set<string>>(loadProcessedCaptureIds())
+  const [storageWarning, setStorageWarning] = React.useState(false)
+
+  // Custom hooks encapsulate bridge polling and Google Calendar sync
+  const bridgeStatus = useBridgeSync(setState)
+  const syncGoogleCalendar = useGoogleCalendarSync(setState)
 
   // ── Dark mode ────────────────────────────────────────────────────
   React.useEffect(() => {
@@ -55,6 +44,13 @@ export default function App() {
 
   // ── Persist ──────────────────────────────────────────────────────
   React.useEffect(() => { saveState(state) }, [state])
+
+  // ── Storage quota warning ────────────────────────────────────────
+  React.useEffect(() => {
+    const handler = () => setStorageWarning(true)
+    window.addEventListener('mandy:storage-quota-exceeded', handler)
+    return () => window.removeEventListener('mandy:storage-quota-exceeded', handler)
+  }, [])
 
   // ── Notifications ────────────────────────────────────────────────
   React.useEffect(() => {
@@ -77,67 +73,37 @@ export default function App() {
     return () => document.removeEventListener('keydown', h)
   }, [])
 
-  // ── API Bridge polling ───────────────────────────────────────────
+  // ── Initial Google Calendar sync (best-effort) ───────────────────
   React.useEffect(() => {
-    let active = true
-    const appendCapture = (capture: BridgeCapture) => {
-      setState(current => {
-        const draft = parseSmartTask(capture.text, current.groups)
-        if (!draft.groupId) return current
-        return {
-          ...current,
-          groups: current.groups.map(group => {
-            if (group.id !== draft.groupId) return group
-            const sourceLabel = capture.source === 'whatsapp' ? 'נקלט מווצאפ' : capture.source === 'shortcut' ? 'נקלט מקיצור דרך' : 'נקלט חיצוני'
-            const newTask: Task = {
-              id: `task-${capture.id}`, title: draft.title, assignee: draft.assignee,
-              status: 'לא התחיל', priority: draft.priority, dueDate: draft.dueDate,
-              notes: `${sourceLabel}: ${capture.text}`, createdAt: capture.createdAt,
-              subtasks: [], tags: [], recurring: 'none', order: group.tasks.length,
-            }
-            return { ...group, tasks: [...group.tasks, newTask] }
-          }),
-        }
-      })
-    }
-    const pollBridge = async () => {
-      try {
-        await checkBridgeHealth()
-        if (!active) return
-        setBridgeStatus('connected')
-        const captures = await fetchBridgeInbox()
-        for (const capture of captures) {
-          if (processedCaptureIdsRef.current.has(capture.id)) { await ackBridgeCapture(capture.id); continue }
-          appendCapture(capture)
-          processedCaptureIdsRef.current.add(capture.id)
-          saveProcessedCaptureIds(processedCaptureIdsRef.current)
-          await ackBridgeCapture(capture.id)
-        }
-      } catch { if (active) setBridgeStatus('offline') }
-    }
-    void pollBridge()
-    const id = window.setInterval(() => void pollBridge(), 5000)
-    return () => { active = false; window.clearInterval(id) }
+    syncGoogleCalendar().catch(() => {
+      // Calendar sync is optional until GOOGLE_CALENDAR_ICS_URL is configured.
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ── Group ops ────────────────────────────────────────────────────
-  const toggleCollapse = (groupId: string) =>
-    setState(s => ({ ...s, groups: s.groups.map(g => g.id === groupId ? { ...g, collapsed: !g.collapsed } : g) }))
+  const toggleCollapse = React.useCallback((groupId: string) =>
+    setState(s => ({ ...s, groups: s.groups.map(g => g.id === groupId ? { ...g, collapsed: !g.collapsed } : g) })),
+  [])
 
-  const addGroup = () => {
-    const usedColors = new Set(state.groups.map(g => g.color))
-    const color = GROUP_COLORS.find(c => !usedColors.has(c)) ?? GROUP_COLORS[state.groups.length % GROUP_COLORS.length]
-    setState(s => ({ ...s, groups: [...s.groups, { id: 'group-' + genId(), title: 'קבוצה חדשה', color, collapsed: false, order: s.groups.length, tasks: [] }] }))
-  }
+  const addGroup = React.useCallback(() => {
+    setState(s => {
+      const usedColors = new Set(s.groups.map(g => g.color))
+      const color = GROUP_COLORS.find(c => !usedColors.has(c)) ?? GROUP_COLORS[s.groups.length % GROUP_COLORS.length]
+      return { ...s, groups: [...s.groups, { id: 'group-' + genId(), title: 'קבוצה חדשה', color, collapsed: false, order: s.groups.length, tasks: [] }] }
+    })
+  }, [])
 
-  const deleteGroup = (groupId: string) =>
-    setState(s => ({ ...s, groups: s.groups.filter(g => g.id !== groupId) }))
+  const deleteGroup = React.useCallback((groupId: string) =>
+    setState(s => ({ ...s, groups: s.groups.filter(g => g.id !== groupId) })),
+  [])
 
-  const renameGroup = (groupId: string, title: string) =>
-    setState(s => ({ ...s, groups: s.groups.map(g => g.id === groupId ? { ...g, title } : g) }))
+  const renameGroup = React.useCallback((groupId: string, title: string) =>
+    setState(s => ({ ...s, groups: s.groups.map(g => g.id === groupId ? { ...g, title } : g) })),
+  [])
 
   // ── Task ops ─────────────────────────────────────────────────────
-  const addTask = (groupId: string, title: string, defaults: NewTaskDefaults = {}) => {
+  const addTask = React.useCallback((groupId: string, title: string, defaults: NewTaskDefaults = {}) => {
     setState(s => ({
       ...s,
       groups: s.groups.map(g => {
@@ -153,143 +119,66 @@ export default function App() {
         return { ...g, tasks: [...g.tasks, newTask] }
       }),
     }))
-  }
+  }, [])
 
-  const updateTask = (groupId: string, taskId: string, patch: Partial<Task>) =>
+  const updateTask = React.useCallback((groupId: string, taskId: string, patch: Partial<Task>) =>
     setState(s => ({
       ...s,
       groups: s.groups.map(g =>
         g.id === groupId ? { ...g, tasks: g.tasks.map(t => t.id === taskId ? { ...t, ...patch } : t) } : g
       ),
-    }))
+    })),
+  [])
 
-  const deleteTask = (groupId: string, taskId: string) =>
+  const deleteTask = React.useCallback((groupId: string, taskId: string) =>
     setState(s => ({
       ...s,
       groups: s.groups.map(g =>
         g.id === groupId ? { ...g, tasks: g.tasks.filter(t => t.id !== taskId) } : g
       ),
-    }))
+    })),
+  [])
 
-  const reorderTasks = (groupId: string, tasks: Task[]) =>
-    setState(s => ({ ...s, groups: s.groups.map(g => g.id === groupId ? { ...g, tasks } : g) }))
+  const reorderTasks = React.useCallback((groupId: string, tasks: Task[]) =>
+    setState(s => ({ ...s, groups: s.groups.map(g => g.id === groupId ? { ...g, tasks } : g) })),
+  [])
 
   // ── Tags ─────────────────────────────────────────────────────────
-  const createTag = (tag: Tag) =>
-    setState(s => ({ ...s, tags: [...s.tags, tag] }))
+  const createTag = React.useCallback((tag: Tag) =>
+    setState(s => ({ ...s, tags: [...s.tags, tag] })),
+  [])
 
   // ── Filter / view ────────────────────────────────────────────────
-  const setViewMode = (viewMode: ViewMode) => setState(s => ({ ...s, viewMode }))
-  const toggleDarkMode = () => setState(s => ({ ...s, darkMode: !s.darkMode }))
+  const setViewMode = React.useCallback((viewMode: ViewMode) => setState(s => ({ ...s, viewMode })), [])
+  const toggleDarkMode = React.useCallback(() => setState(s => ({ ...s, darkMode: !s.darkMode })), [])
 
   // ── Recurring ────────────────────────────────────────────────────
-  const addRecurringTask = (input: RecurringTaskInput) =>
-    setState(s => ({ ...s, recurringTasks: [...s.recurringTasks, createRecurringTask(input)] }))
+  const addRecurringTask = React.useCallback((input: RecurringTaskInput) =>
+    setState(s => ({ ...s, recurringTasks: [...s.recurringTasks, createRecurringTask(input)] })),
+  [])
 
-  const updateRecurringTask = (templateId: string, patch: Partial<RecurringTaskInput>) =>
-    setState(s => ({ ...s, recurringTasks: s.recurringTasks.map(t => t.id === templateId ? { ...t, ...patch } : t) }))
+  const updateRecurringTask = React.useCallback((templateId: string, patch: Partial<RecurringTaskInput>) =>
+    setState(s => ({ ...s, recurringTasks: s.recurringTasks.map(t => t.id === templateId ? { ...t, ...patch } : t) })),
+  [])
 
-  const deleteRecurringTask = (templateId: string) =>
-    setState(s => ({ ...s, recurringTasks: s.recurringTasks.filter(t => t.id !== templateId) }))
+  const deleteRecurringTask = React.useCallback((templateId: string) =>
+    setState(s => ({ ...s, recurringTasks: s.recurringTasks.filter(t => t.id !== templateId) })),
+  [])
 
-  const generateRecurringWeek = (): number => {
-    const result = materializeRecurringTasks(state, { daysAhead: 7 })
-    setState(result.state)
-    return result.addedCount
-  }
-
-  const syncGoogleCalendar = async (calendarUrl?: string): Promise<number> => {
-    const result = calendarUrl?.trim()
-      ? await fetchGoogleCalendarTasks(calendarUrl)
-      : await syncGoogleCalendarBidirectional(state.groups.flatMap(group => group.tasks))
-    if (!result.ok) throw new Error(result.error ?? 'google_calendar_sync_failed')
-
-    let addedCount = 0
-    setState(current => {
-      const exportedIds = new Map((result.exportedTasks ?? []).map(item => [item.taskId, item.eventId]))
-      const importedById = new Map(result.events.map(event => [event.id, event]))
-      const existingExternalIds = new Set(
-        current.groups.flatMap(group =>
-          group.tasks
-            .filter(task => task.externalSource === 'google-calendar' && task.externalId)
-            .map(task => task.externalId as string)
-        )
-      )
-      const fallbackTitleDates = new Set(
-        current.groups.flatMap(group => group.tasks.map(task => `${task.title}|${task.dueDate}`))
-      )
-
-      const importedEvents = result.events.filter(event =>
-        !existingExternalIds.has(event.id) && !fallbackTitleDates.has(`${event.title}|${event.dueDate}`)
-      )
-      addedCount = importedEvents.length
-      const groupsWithExportIds = current.groups.map(group => ({
-        ...group,
-        tasks: group.tasks.map(task =>
-          exportedIds.has(task.id)
-            ? { ...task, externalSource: 'google-calendar' as const, externalId: exportedIds.get(task.id), externalUpdatedAt: result.syncedAt }
-            : task.externalSource === 'google-calendar' && task.externalId && importedById.has(task.externalId)
-              ? {
-                  ...task,
-                  title: importedById.get(task.externalId)?.title ?? task.title,
-                  dueDate: importedById.get(task.externalId)?.dueDate ?? task.dueDate,
-                  notes: googleEventToTaskDefaults(importedById.get(task.externalId)!).notes ?? task.notes,
-                  externalUpdatedAt: importedById.get(task.externalId)?.updatedAt ?? task.externalUpdatedAt,
-                }
-            : task
-        ),
-      }))
-      const baseState = { ...current, groups: groupsWithExportIds }
-      if (importedEvents.length === 0) return baseState
-
-      const existingGroup = groupsWithExportIds.find(group => group.title === GOOGLE_CALENDAR_GROUP_TITLE)
-      const targetGroup = existingGroup ?? {
-        id: `group-google-calendar-${genId()}`,
-        title: GOOGLE_CALENDAR_GROUP_TITLE,
-        color: 'teal',
-        collapsed: false,
-        order: groupsWithExportIds.length,
-        tasks: [],
-      }
-
-      const newTasks: Task[] = importedEvents.map((event, index) => ({
-        id: `task-google-${event.id.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 36)}-${genId()}`,
-        title: event.title,
-        ...googleEventToTaskDefaults(event),
-        subtasks: [],
-        tags: ['tag-weekly'],
-        order: targetGroup.tasks.length + index,
-        createdAt: result.syncedAt ?? new Date().toISOString(),
-      } as Task))
-
-      if (existingGroup) {
-        return {
-          ...baseState,
-          groups: groupsWithExportIds.map(group =>
-            group.id === existingGroup.id ? { ...group, tasks: [...group.tasks, ...newTasks] } : group
-          ),
-        }
-      }
-
-      return {
-        ...baseState,
-        groups: [...groupsWithExportIds, { ...targetGroup, tasks: newTasks }],
-      }
+  const generateRecurringWeek = React.useCallback((): number => {
+    let added = 0
+    setState(s => {
+      const result = materializeRecurringTasks(s, { daysAhead: 7 })
+      added = result.addedCount
+      return result.state
     })
-
-    return addedCount
-  }
-
-  React.useEffect(() => {
-    void syncGoogleCalendar().catch(() => {
-      // Calendar sync is optional until GOOGLE_CALENDAR_ICS_URL is configured.
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return added
   }, [])
 
   // ── Import ───────────────────────────────────────────────────────
-  const handleImport = (imported: BoardState) =>
-    setState({ ...imported, darkMode: state.darkMode, viewMode: state.viewMode })
+  const handleImport = React.useCallback((imported: BoardState) =>
+    setState(s => ({ ...imported, darkMode: s.darkMode, viewMode: s.viewMode })),
+  [])
 
   // ── Styling ──────────────────────────────────────────────────────
   const dm = state.darkMode
@@ -300,6 +189,24 @@ export default function App() {
   return (
     <div className={`flex flex-col h-screen overflow-hidden ${pageBg}`} dir="rtl">
       <Header viewMode={state.viewMode} darkMode={dm} onViewChange={setViewMode} onDarkModeToggle={toggleDarkMode} />
+
+      {/* Storage quota warning banner */}
+      {storageWarning && (
+        <div
+          role="alert"
+          className="bg-amber-50 border-b border-amber-200 text-amber-800 text-xs px-4 py-2 flex items-center justify-between"
+        >
+          <span>⚠️ האחסון המקומי מלא — הנתונים לא נשמרו. מחק משימות ישנות או ייצא גיבוי.</span>
+          <button
+            onClick={() => setStorageWarning(false)}
+            className="text-amber-600 hover:text-amber-800 font-bold ml-3"
+            aria-label="סגור התראה"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       <StatsBar groups={state.groups} darkMode={dm} />
       <FilterBar
         filterAssignee={state.filterAssignee}
@@ -320,16 +227,24 @@ export default function App() {
         <div className="max-w-6xl mx-auto px-4 py-2">
           <button
             onClick={() => setShowTools(t => !t)}
+            aria-expanded={showTools}
+            aria-controls="tools-panel"
             className={`flex items-center gap-1.5 text-xs font-medium ${dm ? 'text-gray-400 hover:text-gray-200' : 'text-gray-500 hover:text-gray-700'} transition-colors`}
           >
-            <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${showTools ? '' : '-rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              className={`w-3.5 h-3.5 transition-transform duration-200 ${showTools ? '' : '-rotate-90'}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
             <span>כלים • Ctrl+K לאיסוף מהיר</span>
           </button>
 
           {showTools && (
-            <div className="mt-3 space-y-3 pb-3">
+            <div id="tools-panel" className="mt-3 space-y-3 pb-3">
               <SmartCapture groups={state.groups} onAddTask={addTask} />
               <SmartFocus groups={state.groups} onUpdateTask={updateTask} />
               <RecurringRoutines
@@ -357,7 +272,7 @@ export default function App() {
             state.groups.length === 0 ? (
               <div className="text-center py-20">
                 <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 ${dm ? 'bg-indigo-900/40' : 'bg-indigo-100'}`}>
-                  <svg className="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
                   </svg>
                 </div>
@@ -365,29 +280,31 @@ export default function App() {
                 <p className={`text-sm mb-4 ${dm ? 'text-gray-500' : 'text-gray-400'}`}>לחצו על "קבוצה" כדי להתחיל</p>
               </div>
             ) : (
-              state.groups
-                .slice()
-                .sort((a, b) => a.order - b.order)
-                .map(group => (
-                  <BoardGroup
-                    key={group.id}
-                    group={group}
-                    filterAssignee={state.filterAssignee}
-                    filterStatus={state.filterStatus}
-                    filterTag={state.filterTag ?? ''}
-                    searchQuery={state.searchQuery ?? ''}
-                    allTags={state.tags}
-                    darkMode={dm}
-                    onToggleCollapse={toggleCollapse}
-                    onUpdateTask={updateTask}
-                    onDeleteTask={deleteTask}
-                    onAddTask={addTask}
-                    onDeleteGroup={deleteGroup}
-                    onRenameGroup={renameGroup}
-                    onReorderTasks={reorderTasks}
-                    onCreateTag={createTag}
-                  />
-                ))
+              <div role="list" aria-label="קבוצות משימות">
+                {state.groups
+                  .slice()
+                  .sort((a, b) => a.order - b.order)
+                  .map(group => (
+                    <BoardGroup
+                      key={group.id}
+                      group={group}
+                      filterAssignee={state.filterAssignee}
+                      filterStatus={state.filterStatus}
+                      filterTag={state.filterTag ?? ''}
+                      searchQuery={state.searchQuery ?? ''}
+                      allTags={state.tags}
+                      darkMode={dm}
+                      onToggleCollapse={toggleCollapse}
+                      onUpdateTask={updateTask}
+                      onDeleteTask={deleteTask}
+                      onAddTask={addTask}
+                      onDeleteGroup={deleteGroup}
+                      onRenameGroup={renameGroup}
+                      onReorderTasks={reorderTasks}
+                      onCreateTag={createTag}
+                    />
+                  ))}
+              </div>
             )
           )}
 
@@ -400,6 +317,7 @@ export default function App() {
           )}
         </div>
       </main>
+
       <MobileBottomNav
         viewMode={state.viewMode}
         toolsOpen={showTools}
