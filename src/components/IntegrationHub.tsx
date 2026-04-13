@@ -1,0 +1,99 @@
+import React from 'react'
+import { BridgeStatus, captureExternalTask } from '../apiBridge'
+
+interface Props {
+  bridgeStatus: BridgeStatus
+}
+
+const statusText: Record<BridgeStatus, string> = {
+  checking: 'בודק חיבור',
+  connected: 'מחובר',
+  offline: 'לא מחובר',
+}
+
+const statusClass: Record<BridgeStatus, string> = {
+  checking: 'bg-amber-50 text-amber-700 border-amber-200',
+  connected: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  offline: 'bg-gray-50 text-gray-500 border-gray-200',
+}
+
+export const IntegrationHub: React.FC<Props> = ({ bridgeStatus }) => {
+  const [testText, setTestText] = React.useState('מחר לקנות חלב לילדים, שנינו, בינוני')
+  const [message, setMessage] = React.useState('')
+
+  React.useEffect(() => {
+    if (!message) return
+    const timeoutId = window.setTimeout(() => setMessage(''), 3000)
+    return () => window.clearTimeout(timeoutId)
+  }, [message])
+
+  const sendTest = async () => {
+    try {
+      await captureExternalTask(testText, 'shortcut')
+      setMessage('נשלח לגשר. מאנדי ימשוך את זה כמשימה חכמה בעוד רגע.')
+    } catch {
+      setMessage('הגשר לא מחובר כרגע. הפעילו npm run bridge בחלון נפרד.')
+    }
+  }
+
+  return (
+    <section className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-base font-bold text-gray-900">חיבורים ואפליקציה</h2>
+          <p className="text-xs text-gray-500 mt-1">
+            מאנדי יכול לקבל משימות מבחוץ: קיצור דרך, n8n, ווב־הוק, או בוט ווצאפ דרך Cloud API.
+          </p>
+        </div>
+        <span className={`text-xs font-semibold rounded border px-3 py-1.5 ${statusClass[bridgeStatus]}`}>
+          {statusText[bridgeStatus]}
+        </span>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-3 mt-4">
+        <div className="border border-gray-200 rounded p-3 bg-gray-50">
+          <div className="text-xs font-bold text-gray-700">אפליקציה להתקנה</div>
+          <p className="text-xs text-gray-500 leading-5 mt-2">
+            במסך הבית של הדפדפן אפשר להתקין את מאנדי כאפליקציה. היא תיפתח במסך נקי ותמשיך לשמור נתונים מקומית.
+          </p>
+        </div>
+
+        <div className="border border-gray-200 rounded p-3 bg-gray-50">
+          <div className="text-xs font-bold text-gray-700">API למשימות</div>
+          <p className="text-xs text-gray-500 leading-5 mt-2">
+            שליחת POST אל /api/bridge/capture עם text תכניס משימה ל־inbox החכם.
+          </p>
+        </div>
+
+        <div className="border border-gray-200 rounded p-3 bg-gray-50">
+          <div className="text-xs font-bold text-gray-700">ווצאפ</div>
+          <p className="text-xs text-gray-500 leading-5 mt-2">
+            ה־Webhook מוכן ב־/webhooks/whatsapp. צריך טוקן Meta, מספר Business ו־URL ציבורי ב־HTTPS.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-2 md:grid-cols-[minmax(0,1fr)_120px]">
+        <input
+          value={testText}
+          onChange={event => setTestText(event.target.value)}
+          dir="rtl"
+          className="rounded border border-gray-200 px-3 py-2 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-cyan-300"
+        />
+        <button
+          type="button"
+          onClick={sendTest}
+          className="rounded bg-cyan-700 text-white text-xs font-semibold px-3 py-2 hover:bg-cyan-800 transition-colors"
+        >
+          בדיקת חיבור
+        </button>
+      </div>
+
+      {message && (
+        <div className="mt-3 text-xs font-medium text-cyan-700 bg-cyan-50 border border-cyan-200 rounded px-3 py-2">
+          {message}
+        </div>
+      )}
+    </section>
+  )
+}

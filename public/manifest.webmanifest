@@ -1,0 +1,20 @@
+{
+  "name": "מאנדי בית",
+  "short_name": "מאנדי",
+  "description": "ניהול משימות בית, רוטינות וחיבורים חכמים.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "dir": "rtl",
+  "lang": "he",
+  "background_color": "#f8f9fb",
+  "theme_color": "#0f766e",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
