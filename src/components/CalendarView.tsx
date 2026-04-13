@@ -6,6 +6,9 @@ interface Props {
   groups: Group[]
   darkMode?: boolean
   onUpdateTask?: (groupId: string, taskId: string, patch: Partial<Task>) => void
+  googleAuthUrl?: string
+  calendarSyncing?: boolean
+  onCalendarSync?: () => void
 }
 
 const DAYS_HE = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
@@ -49,7 +52,14 @@ function weekTitle(offset: number): string {
   return `שבוע ${offset > 0 ? '+' : ''}${offset}`
 }
 
-export const CalendarView: React.FC<Props> = ({ groups, darkMode, onUpdateTask }) => {
+export const CalendarView: React.FC<Props> = ({
+  groups,
+  darkMode,
+  onUpdateTask,
+  googleAuthUrl,
+  calendarSyncing,
+  onCalendarSync,
+}) => {
   const [weekOffset, setWeekOffset] = React.useState(0)
 
   const today = React.useMemo(() => {
@@ -132,6 +142,28 @@ export const CalendarView: React.FC<Props> = ({ groups, darkMode, onUpdateTask }
         </div>
 
         <div className="flex items-center gap-2">
+          <a
+            href={googleAuthUrl || undefined}
+            className={`text-xs font-semibold px-3 py-1.5 rounded border transition-colors ${
+              googleAuthUrl
+                ? darkMode
+                  ? 'bg-sky-800 border-sky-700 text-sky-100 hover:bg-sky-700'
+                  : 'bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100'
+                : darkMode
+                  ? 'bg-gray-700 border-gray-600 text-gray-500 pointer-events-none'
+                  : 'bg-gray-100 border-gray-200 text-gray-400 pointer-events-none'
+            }`}
+          >
+            חבר יומן
+          </a>
+          <button
+            type="button"
+            onClick={onCalendarSync}
+            disabled={calendarSyncing}
+            className="text-xs font-semibold px-3 py-1.5 rounded border transition-colors bg-emerald-700 border-emerald-700 text-white hover:bg-emerald-800 disabled:bg-gray-300 disabled:border-gray-300"
+          >
+            {calendarSyncing ? 'מסנכרן...' : 'סנכרן יומן'}
+          </button>
           <button
             type="button"
             onClick={exportWeek}

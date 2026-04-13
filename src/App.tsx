@@ -451,7 +451,14 @@ export default function App() {
           )}
 
           {state.viewMode === 'calendar' && (
-            <CalendarView groups={state.groups} darkMode={dm} onUpdateTask={updateTask} />
+            <CalendarView
+              groups={state.groups}
+              darkMode={dm}
+              onUpdateTask={updateTask}
+              googleAuthUrl={googleAuthUrl}
+              calendarSyncing={quickCalendarSyncing}
+              onCalendarSync={quickSyncGoogleCalendar}
+            />
           )}
 
           {state.viewMode === 'analytics' && (
