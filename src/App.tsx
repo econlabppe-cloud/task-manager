@@ -326,7 +326,15 @@ export default function App() {
 
   return (
     <div className={`flex flex-col h-screen overflow-hidden ${pageBg}`} dir="rtl">
-      <Header viewMode={state.viewMode} darkMode={dm} onViewChange={setViewMode} onDarkModeToggle={toggleDarkMode} />
+      <Header
+        viewMode={state.viewMode}
+        darkMode={dm}
+        onViewChange={setViewMode}
+        onDarkModeToggle={toggleDarkMode}
+        googleAuthUrl={googleAuthUrl}
+        calendarSyncing={quickCalendarSyncing}
+        onCalendarSync={quickSyncGoogleCalendar}
+      />
       <StatsBar groups={state.groups} darkMode={dm} />
       <FilterBar
         filterAssignee={state.filterAssignee}

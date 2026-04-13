@@ -6,6 +6,9 @@ interface Props {
   darkMode: boolean
   onViewChange: (mode: ViewMode) => void
   onDarkModeToggle: () => void
+  googleAuthUrl?: string
+  calendarSyncing?: boolean
+  onCalendarSync?: () => void
 }
 
 const VIEWS: { mode: ViewMode; label: string; icon: React.ReactNode }[] = [
@@ -38,7 +41,15 @@ const VIEWS: { mode: ViewMode; label: string; icon: React.ReactNode }[] = [
   },
 ]
 
-export const Header: React.FC<Props> = ({ viewMode, darkMode, onViewChange, onDarkModeToggle }) => {
+export const Header: React.FC<Props> = ({
+  viewMode,
+  darkMode,
+  onViewChange,
+  onDarkModeToggle,
+  googleAuthUrl,
+  calendarSyncing,
+  onCalendarSync,
+}) => {
   const headerBg = darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
   const logoText = darkMode ? 'text-gray-100' : 'text-gray-900'
   const mutedText = darkMode ? 'text-gray-500' : 'text-gray-400'
@@ -86,6 +97,25 @@ export const Header: React.FC<Props> = ({ viewMode, darkMode, onViewChange, onDa
 
       {/* Right controls */}
       <div className="flex items-center gap-2">
+        <a
+          href={googleAuthUrl || undefined}
+          className={`rounded px-3 py-2 text-xs font-semibold transition-colors ${
+            googleAuthUrl
+              ? 'bg-sky-700 text-white hover:bg-sky-800'
+              : darkMode ? 'bg-gray-800 text-gray-500 pointer-events-none' : 'bg-gray-200 text-gray-400 pointer-events-none'
+          }`}
+        >
+          חבר יומן
+        </a>
+        <button
+          type="button"
+          onClick={onCalendarSync}
+          disabled={calendarSyncing}
+          className="rounded bg-emerald-700 text-white text-xs font-semibold px-3 py-2 hover:bg-emerald-800 disabled:bg-gray-300 transition-colors"
+        >
+          {calendarSyncing ? 'מסנכרן...' : 'סנכרן יומן'}
+        </button>
+
         {/* Dark mode toggle */}
         <button
           onClick={onDarkModeToggle}
