@@ -10,6 +10,7 @@ function json(status: number, body: unknown) {
 const TOKEN_COOKIE = 'mandy_google_calendar_token'
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const GOOGLE_EVENTS_URL = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
+const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo'
 declare const Buffer: any
 declare const process: { env: Record<string, string | undefined> }
 
@@ -139,6 +140,24 @@ async function getAccessToken(request: Request): Promise<string | null> {
   return refreshed.access_token || token.access_token
 }
 
+function allowedEmailsSet() {
+  const raw = process.env.ALLOWED_EMAILS ?? ''
+  const emails = raw
+    .split(',')
+    .map(item => item.trim().toLowerCase())
+    .filter(Boolean)
+  return new Set(emails)
+}
+
+async function fetchGoogleEmail(accessToken: string) {
+  const response = await fetch(GOOGLE_USERINFO_URL, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!response.ok) return ''
+  const body = await response.json() as { email?: string }
+  return String(body.email ?? '').toLowerCase()
+}
+
 function googleEventToTask(event: Record<string, any>) {
   const start = event.start?.date || String(event.start?.dateTime ?? '').slice(0, 10)
   const description = String(event.description ?? '')
@@ -224,6 +243,18 @@ async function oauthSync(request: Request) {
       error: 'google_calendar_not_connected',
       message: 'Connect Google Calendar first.',
     })
+  }
+
+  const allowedEmails = allowedEmailsSet()
+  if (allowedEmails.size > 0) {
+    const email = await fetchGoogleEmail(accessToken)
+    if (!email || !allowedEmails.has(email)) {
+      return json(403, {
+        ok: false,
+        error: 'account_not_allowed',
+        message: 'This account is not allowed for this checklist.',
+      })
+    }
   }
 
   let tasks: SyncTask[] = []

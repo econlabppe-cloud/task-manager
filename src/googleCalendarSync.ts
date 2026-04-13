@@ -21,6 +21,10 @@ export interface GoogleCalendarSyncResult {
 export interface GoogleCalendarAuthStatus {
   ok: boolean
   connected: boolean
+  allowed?: boolean
+  accessGateEnabled?: boolean
+  email?: string
+  message?: string
   authUrl?: string
 }
 

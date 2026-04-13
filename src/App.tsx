@@ -36,6 +36,10 @@ export default function App() {
   const [showTools, setShowTools] = React.useState(false)
   const [storageWarning, setStorageWarning] = React.useState(false)
   const [googleAuthUrl, setGoogleAuthUrl] = React.useState('')
+  const [accessGateEnabled, setAccessGateEnabled] = React.useState(false)
+  const [allowedAccess, setAllowedAccess] = React.useState(true)
+  const [authChecked, setAuthChecked] = React.useState(false)
+  const [signedEmail, setSignedEmail] = React.useState('')
   const [calendarQuickMessage, setCalendarQuickMessage] = React.useState('')
   const [quickCalendarSyncing, setQuickCalendarSyncing] = React.useState(false)
 
@@ -79,8 +83,17 @@ export default function App() {
 
   React.useEffect(() => {
     void fetchGoogleCalendarAuthStatus()
-      .then(status => setGoogleAuthUrl(status.authUrl ?? ''))
-      .catch(() => setGoogleAuthUrl(''))
+      .then(status => {
+        setGoogleAuthUrl(status.authUrl ?? '')
+        setAccessGateEnabled(Boolean(status.accessGateEnabled))
+        setAllowedAccess(status.allowed !== false)
+        setSignedEmail(status.email ?? '')
+        setAuthChecked(true)
+      })
+      .catch(() => {
+        setGoogleAuthUrl('')
+        setAuthChecked(true)
+      })
   }, [])
 
   React.useEffect(() => {
@@ -215,6 +228,26 @@ export default function App() {
   const pageBg = dm ? 'bg-gray-950' : 'bg-gray-50'
   const mainBg = dm ? 'bg-gray-900' : 'bg-gray-50'
   const toolsBg = dm ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'
+
+  if (accessGateEnabled && authChecked && !allowedAccess) {
+    return (
+      <div className={`min-h-screen ${pageBg} flex items-center justify-center p-4`} dir="rtl">
+        <div className={`w-full max-w-md rounded-xl border p-6 ${dm ? 'bg-gray-900 border-gray-700 text-gray-100' : 'bg-white border-gray-200 text-gray-900'}`}>
+          <h1 className="text-lg font-bold mb-2">גישה פרטית לצ'ק ליסט בית</h1>
+          <p className={`${dm ? 'text-gray-300' : 'text-gray-600'} text-sm leading-6`}>
+            הגישה זמינה רק לחשבונות Google שאושרו מראש.
+            {signedEmail ? ` החשבון הנוכחי: ${signedEmail}` : ''}
+          </p>
+          <a
+            href={googleAuthUrl || undefined}
+            className={`mt-4 inline-flex items-center justify-center rounded px-4 py-2 text-sm font-semibold transition-colors ${googleAuthUrl ? 'bg-sky-700 text-white hover:bg-sky-800' : 'bg-gray-200 text-gray-400 pointer-events-none'}`}
+          >
+            התחברות עם גוגל
+          </a>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={`flex flex-col h-screen overflow-hidden ${pageBg}`} dir="rtl">
