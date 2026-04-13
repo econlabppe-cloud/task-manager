@@ -300,7 +300,7 @@ export default function App() {
           )}
 
           {state.viewMode === 'calendar' && (
-            <CalendarView groups={state.groups} darkMode={dm} />
+            <CalendarView groups={state.groups} darkMode={dm} onUpdateTask={updateTask} />
           )}
 
           {state.viewMode === 'analytics' && (

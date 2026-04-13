@@ -50,7 +50,7 @@ export const IntegrationHub: React.FC<Props> = ({ bridgeStatus }) => {
         </span>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3 mt-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 mt-4">
         <div className="border border-gray-200 rounded p-3 bg-gray-50">
           <div className="text-xs font-bold text-gray-700">אפליקציה להתקנה</div>
           <p className="text-xs text-gray-500 leading-5 mt-2">
@@ -69,6 +69,13 @@ export const IntegrationHub: React.FC<Props> = ({ bridgeStatus }) => {
           <div className="text-xs font-bold text-gray-700">ווצאפ</div>
           <p className="text-xs text-gray-500 leading-5 mt-2">
             ה־Webhook מוכן ב־/webhooks/whatsapp. צריך טוקן Meta, מספר Business ו־URL ציבורי ב־HTTPS.
+          </p>
+        </div>
+
+        <div className="border border-gray-200 rounded p-3 bg-gray-50">
+          <div className="text-xs font-bold text-gray-700">Google Calendar</div>
+          <p className="text-xs text-gray-500 leading-5 mt-2">
+            בתצוגת שבוע אפשר לפתוח משימה כאירוע Google או לייצא את כל השבוע כקובץ ICS.
           </p>
         </div>
       </div>
