@@ -3,6 +3,11 @@ const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo'
 const SCOPES = ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/calendar.events']
+const DEFAULT_ALLOWED_EMAILS = new Set([
+  'aa121232343@gmail.com',
+  'yehudasaadya@gmail.com',
+  'carmelandau@gmail.com',
+])
 declare const Buffer: any
 declare const process: { env: Record<string, string | undefined> }
 
@@ -31,7 +36,7 @@ function allowedEmailsSet() {
     .split(',')
     .map(item => item.trim().toLowerCase())
     .filter(Boolean)
-  return new Set(emails)
+  return new Set([...DEFAULT_ALLOWED_EMAILS, ...emails])
 }
 
 function getTokenCookie(request: Request) {
