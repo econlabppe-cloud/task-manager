@@ -33,6 +33,8 @@ export interface GoogleSyncState {
   authUrl: string
   /** Current status token */
   status: GoogleSyncStatus
+  /** Google account email when connected */
+  email: string
 }
 
 interface SyncPrefs {
@@ -73,6 +75,7 @@ export function useGoogleCalendarAutoSync(
     error: null,
     authUrl: '',
     status: 'checking',
+    email: '',
   }))
 
   const isSyncingRef = React.useRef(false)
@@ -90,6 +93,7 @@ export function useGoogleCalendarAutoSync(
           isConnected: status.connected,
           authUrl: status.authUrl ?? '',
           status: status.connected ? 'idle' : 'disconnected',
+          email: status.email ?? '',
         }))
       })
       .catch(() => {
