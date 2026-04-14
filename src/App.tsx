@@ -9,6 +9,7 @@ import { createRecurringTask, materializeRecurringTasks } from './recurringTasks
 import { requestNotificationPermission, checkDueTasks } from './notifications'
 import { useBridgeSync } from './hooks/useBridgeSync'
 import { useGoogleCalendarSync } from './hooks/useGoogleCalendarSync'
+import { useGoogleCalendarAutoSync } from './hooks/useGoogleCalendarAutoSync'
 import { useConfetti, ConfettiOverlay } from './hooks/useConfetti'
 import { useStreak } from './hooks/useStreak'
 import { GROUP_COLORS } from './constants'
@@ -35,9 +36,10 @@ export default function App() {
   const [showTools, setShowTools] = React.useState(false)
   const [storageWarning, setStorageWarning] = React.useState(false)
 
-  // Custom hooks encapsulate bridge polling and Google Calendar sync
+  // Custom hooks
   const bridgeStatus = useBridgeSync(setState)
   const syncGoogleCalendar = useGoogleCalendarSync(setState)
+  const [googleSyncState, googleSyncControls] = useGoogleCalendarAutoSync(setState, syncGoogleCalendar)
 
   // Confetti
   const [confettiParticles, fireConfetti] = useConfetti()
@@ -94,13 +96,8 @@ export default function App() {
     return () => document.removeEventListener('keydown', h)
   }, [])
 
-  // ── Initial Google Calendar sync (best-effort) ───────────────────
-  React.useEffect(() => {
-    syncGoogleCalendar().catch(() => {
-      // Calendar sync is optional until GOOGLE_CALENDAR_ICS_URL is configured.
-    })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  // Note: initial Google Calendar sync is now handled automatically
+  // by useGoogleCalendarAutoSync when OAuth status is confirmed.
 
   // ── Group ops ────────────────────────────────────────────────────
   const toggleCollapse = React.useCallback((groupId: string) =>
@@ -279,7 +276,13 @@ export default function App() {
               />
               <div className="grid sm:grid-cols-2 gap-3">
                 <ExportImport state={state} onImport={handleImport} darkMode={dm} />
-                <IntegrationHub bridgeStatus={bridgeStatus} onGoogleCalendarSync={syncGoogleCalendar} />
+                <IntegrationHub
+                  bridgeStatus={bridgeStatus}
+                  syncState={googleSyncState}
+                  onManualSync={googleSyncControls.manualSync}
+                  onToggleAutoSync={googleSyncControls.toggleAutoSync}
+                  onDisconnect={googleSyncControls.disconnect}
+                />
               </div>
             </div>
           )}
