@@ -52,14 +52,7 @@ function weekTitle(offset: number): string {
   return `שבוע ${offset > 0 ? '+' : ''}${offset}`
 }
 
-export const CalendarView: React.FC<Props> = ({
-  groups,
-  darkMode,
-  onUpdateTask,
-  googleAuthUrl,
-  calendarSyncing,
-  onCalendarSync,
-}) => {
+export const CalendarView: React.FC<Props> = ({ groups, darkMode, onUpdateTask, googleAuthUrl, calendarSyncing, onCalendarSync }) => {
   const [weekOffset, setWeekOffset] = React.useState(0)
 
   const today = React.useMemo(() => {

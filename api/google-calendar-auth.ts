@@ -3,11 +3,6 @@ const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo'
 const SCOPES = ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/calendar.events']
-const DEFAULT_ALLOWED_EMAILS = new Set([
-  'aa121232343@gmail.com',
-  'yehudasaadya@gmail.com',
-  'carmelandau@gmail.com',
-])
 declare const Buffer: any
 declare const process: { env: Record<string, string | undefined> }
 
@@ -30,13 +25,15 @@ function getRedirectUri(request: Request) {
   return process.env.GOOGLE_REDIRECT_URI || `${getOrigin(request)}/api/google-calendar-auth?callback=1`
 }
 
-function allowedEmailsSet() {
+/** Returns the allowed-email set from ALLOWED_EMAILS env var (comma-separated).
+ *  If the env var is empty/unset, returns an empty set → gate disabled. */
+function allowedEmailsSet(): Set<string> {
   const raw = process.env.ALLOWED_EMAILS ?? ''
   const emails = raw
     .split(',')
     .map(item => item.trim().toLowerCase())
     .filter(Boolean)
-  return new Set([...DEFAULT_ALLOWED_EMAILS, ...emails])
+  return new Set(emails)
 }
 
 function getTokenCookie(request: Request) {
@@ -77,7 +74,7 @@ function encodeCookie(value: unknown) {
   return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url')
 }
 
-async function refreshAccessTokenIfNeeded(token: { access_token?: string, refresh_token?: string, expires_in?: number, created_at?: number }) {
+async function refreshAccessTokenIfNeeded(token: { access_token?: string; refresh_token?: string; expires_in?: number; created_at?: number }) {
   if (!token?.access_token) return null
   const expiresAt = (token.created_at ?? 0) + ((token.expires_in ?? 3600) - 60) * 1000
   if (!token.refresh_token || Date.now() < expiresAt) return token.access_token
@@ -141,7 +138,7 @@ async function accessStatus(request: Request) {
   }
 
   const email = await fetchGoogleEmail(accessToken)
-  const allowed = !accessGateEnabled || (email && allowedEmails.has(email))
+  const allowed = !accessGateEnabled || Boolean(email && allowedEmails.has(email))
 
   return json(200, {
     ok: true,
@@ -193,7 +190,7 @@ async function exchangeCode(request: Request, code: string) {
   const email = accessToken ? await fetchGoogleEmail(accessToken) : ''
   const allowedEmails = allowedEmailsSet()
   const accessGateEnabled = allowedEmails.size > 0
-  const allowed = !accessGateEnabled || (email && allowedEmails.has(email))
+  const allowed = !accessGateEnabled || Boolean(email && allowedEmails.has(email))
   const location = allowed
     ? `${getOrigin(request)}/?googleCalendar=connected`
     : `${getOrigin(request)}/?googleCalendar=not-allowed`

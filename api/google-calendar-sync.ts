@@ -11,11 +11,6 @@ const TOKEN_COOKIE = 'mandy_google_calendar_token'
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const GOOGLE_EVENTS_URL = 'https://www.googleapis.com/calendar/v3/calendars/primary/events'
 const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo'
-const DEFAULT_ALLOWED_EMAILS = new Set([
-  'aa121232343@gmail.com',
-  'yehudasaadya@gmail.com',
-  'carmelandau@gmail.com',
-])
 declare const Buffer: any
 declare const process: { env: Record<string, string | undefined> }
 
@@ -42,16 +37,21 @@ function unfoldIcs(raw: string) {
   return raw.replace(/\r?\n[ \t]/g, '')
 }
 
-function parseIcsDate(value: string) {
+function parseIcsDate(value: string): string {
   if (!value) return ''
-
   const dateOnly = value.match(/^(\d{4})(\d{2})(\d{2})$/)
   if (dateOnly) return `${dateOnly[1]}-${dateOnly[2]}-${dateOnly[3]}`
-
   const dateTime = value.match(/^(\d{4})(\d{2})(\d{2})T/)
   if (dateTime) return `${dateTime[1]}-${dateTime[2]}-${dateTime[3]}`
-
   return ''
+}
+
+function parseIcsTime(value: string): string | undefined {
+  // DTSTART:20231015T140000 → "14:00"
+  // DTSTART:20231015T140000Z → "14:00"
+  // DTSTART:20231015 → undefined (all-day)
+  const m = value.match(/^\d{8}T(\d{2})(\d{2})/)
+  return m ? `${m[1]}:${m[2]}` : undefined
 }
 
 function unescapeIcs(value: string) {
@@ -89,10 +89,12 @@ function parseEvents(rawIcs: string) {
       const endRaw = fieldValue(lines, 'DTEND')
       const dueDate = parseIcsDate(startRaw)
 
+      const startTime = parseIcsTime(startRaw)
       return {
         id: uid || `${summary}-${startRaw}`,
         title: summary || 'אירוע מהיומן',
         dueDate,
+        startTime,
         notes: [
           description,
           location ? `מיקום: ${location}` : '',
@@ -145,27 +147,25 @@ async function getAccessToken(request: Request): Promise<string | null> {
   return refreshed.access_token || token.access_token
 }
 
-function allowedEmailsSet() {
+function allowedEmailsSet(): Set<string> {
   const raw = process.env.ALLOWED_EMAILS ?? ''
-  const emails = raw
-    .split(',')
-    .map(item => item.trim().toLowerCase())
-    .filter(Boolean)
-  return new Set([...DEFAULT_ALLOWED_EMAILS, ...emails])
+  const emails = raw.split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
+  return new Set(emails)
 }
 
 async function fetchGoogleEmail(accessToken: string) {
-  const response = await fetch(GOOGLE_USERINFO_URL, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  })
+  const response = await fetch(GOOGLE_USERINFO_URL, { headers: { Authorization: `Bearer ${accessToken}` } })
   if (!response.ok) return ''
   const body = await response.json() as { email?: string }
   return String(body.email ?? '').toLowerCase()
 }
 
 function googleEventToTask(event: Record<string, any>) {
+  // event.start.date = "2023-10-15" (all-day)
+  // event.start.dateTime = "2023-10-15T14:00:00+03:00" (timed event)
   const rawDateTime: string = event.start?.dateTime ?? ''
   const start = event.start?.date || rawDateTime.slice(0, 10)
+  // Extract "HH:MM" from the dateTime string (already in local time from Google API)
   const startTime: string | undefined = rawDateTime ? rawDateTime.slice(11, 16) : undefined
   const description = String(event.description ?? '')
   return {
@@ -173,7 +173,7 @@ function googleEventToTask(event: Record<string, any>) {
     title: String(event.summary || 'אירוע מהיומן'),
     dueDate: start,
     startTime,
-    notes: description.replace(/\n\nנוצר (מצ'ק ליסט בית|ממאנדי בית)\.[\s\S]*$/m, '').trim(),
+    notes: description.replace(/\n\nנוצר ממאנדי בית\.[\s\S]*$/m, '').trim(),
     updatedAt: String(event.updated ?? ''),
   }
 }
@@ -202,7 +202,7 @@ function taskToGoogleEvent(task: SyncTask) {
     description: [
       task.notes ?? '',
       '',
-      "נוצר מצ'ק ליסט בית.",
+      'נוצר ממאנדי בית.',
       `סטטוס: ${task.status || 'לא התחיל'}`,
       `עדיפות: ${task.priority || 'בינוני'}`,
       task.assignee ? `אחראי: ${task.assignee}` : '',
