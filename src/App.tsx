@@ -10,12 +10,12 @@ import { requestNotificationPermission, checkDueTasks } from './notifications'
 import { useBridgeSync } from './hooks/useBridgeSync'
 import { useGoogleCalendarSync } from './hooks/useGoogleCalendarSync'
 import { useGoogleCalendarAutoSync } from './hooks/useGoogleCalendarAutoSync'
+import { fetchGoogleCalendarAuthStatus } from './googleCalendarSync'
 import { useAssistantCapture } from './hooks/useAssistantCapture'
 import { useShoppingList } from './hooks/useShoppingList'
 import { useConfetti, ConfettiOverlay } from './hooks/useConfetti'
 import { useStreak } from './hooks/useStreak'
 import { GROUP_COLORS } from './constants'
-import { fetchGoogleCalendarAuthStatus } from './googleCalendarSync'
 import { Header } from './components/Header'
 import { StatsBar } from './components/StatsBar'
 import { FilterBar } from './components/FilterBar'
@@ -130,6 +130,7 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // ── Access gate check ───────────────────────────────────────────
   React.useEffect(() => {
     void fetchGoogleCalendarAuthStatus()
       .then(status => {
@@ -138,9 +139,7 @@ export default function App() {
         setSignedEmail(status.email ?? '')
         setAuthChecked(true)
       })
-      .catch(() => {
-        setAuthChecked(true)
-      })
+      .catch(() => { setAuthChecked(true) })
   }, [])
 
   // ── Global shortcut Ctrl+K ───────────────────────────────────────
@@ -285,7 +284,7 @@ export default function App() {
   }
 
   return (
-    <div className={`flex flex-col h-screen overflow-hidden ${pageBg}`} dir="rtl">
+    <div className={`flex flex-col h-screen overflow-hidden max-w-full ${pageBg}`} dir="rtl">
       <Header
         viewMode={state.viewMode}
         darkMode={dm}
@@ -378,7 +377,7 @@ export default function App() {
       </div>
 
       {/* Main */}
-      <main className={`flex-1 overflow-y-auto ${mainBg} pb-20 sm:pb-0`}>
+      <main className={`flex-1 overflow-y-auto overflow-x-hidden ${mainBg} pb-20 sm:pb-0`}>
         <div className="max-w-6xl mx-auto px-4 py-5">
 
           {state.viewMode === 'board' && (
