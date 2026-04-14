@@ -1,7 +1,8 @@
 const TOKEN_COOKIE = 'mandy_google_calendar_token'
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
-const SCOPES = ['https://www.googleapis.com/auth/calendar.events']
+const GOOGLE_USERINFO_URL = 'https://www.googleapis.com/oauth2/v3/userinfo'
+const SCOPES = ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/calendar.events']
 declare const Buffer: any
 declare const process: { env: Record<string, string | undefined> }
 
@@ -24,9 +25,35 @@ function getRedirectUri(request: Request) {
   return process.env.GOOGLE_REDIRECT_URI || `${getOrigin(request)}/api/google-calendar-auth?callback=1`
 }
 
+/** Returns the allowed-email set from ALLOWED_EMAILS env var (comma-separated).
+ *  If the env var is empty/unset, returns an empty set → gate disabled. */
+function allowedEmailsSet(): Set<string> {
+  const raw = process.env.ALLOWED_EMAILS ?? ''
+  const emails = raw
+    .split(',')
+    .map(item => item.trim().toLowerCase())
+    .filter(Boolean)
+  return new Set(emails)
+}
+
 function getTokenCookie(request: Request) {
   const cookie = request.headers.get('cookie') ?? ''
   return cookie.split(';').map(part => part.trim()).find(part => part.startsWith(`${TOKEN_COOKIE}=`))
+}
+
+function decodeCookieToken(request: Request) {
+  const tokenCookie = getTokenCookie(request)
+  if (!tokenCookie) return null
+  try {
+    return JSON.parse(Buffer.from(tokenCookie.slice(TOKEN_COOKIE.length + 1), 'base64url').toString('utf8')) as {
+      access_token?: string
+      refresh_token?: string
+      expires_in?: number
+      created_at?: number
+    }
+  } catch {
+    return null
+  }
 }
 
 function buildAuthUrl(request: Request) {
@@ -45,6 +72,83 @@ function buildAuthUrl(request: Request) {
 
 function encodeCookie(value: unknown) {
   return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url')
+}
+
+async function refreshAccessTokenIfNeeded(token: { access_token?: string; refresh_token?: string; expires_in?: number; created_at?: number }) {
+  if (!token?.access_token) return null
+  const expiresAt = (token.created_at ?? 0) + ((token.expires_in ?? 3600) - 60) * 1000
+  if (!token.refresh_token || Date.now() < expiresAt) return token.access_token
+
+  const clientId = process.env.GOOGLE_CLIENT_ID
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET
+  if (!clientId || !clientSecret) return token.access_token
+
+  const refreshResponse = await fetch(GOOGLE_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: token.refresh_token,
+      grant_type: 'refresh_token',
+    }),
+  })
+  if (!refreshResponse.ok) return token.access_token
+  const refreshed = await refreshResponse.json() as { access_token?: string }
+  return refreshed.access_token || token.access_token
+}
+
+async function fetchGoogleEmail(accessToken: string) {
+  const response = await fetch(GOOGLE_USERINFO_URL, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!response.ok) return ''
+  const body = await response.json() as { email?: string }
+  return String(body.email ?? '').toLowerCase()
+}
+
+async function accessStatus(request: Request) {
+  const authUrl = buildAuthUrl(request)
+  if (!authUrl) {
+    return json(500, { ok: false, connected: false, allowed: false, error: 'missing_google_client_id' })
+  }
+
+  const allowedEmails = allowedEmailsSet()
+  const accessGateEnabled = allowedEmails.size > 0
+  const token = decodeCookieToken(request)
+  if (!token?.access_token) {
+    return json(200, {
+      ok: true,
+      connected: false,
+      allowed: !accessGateEnabled,
+      accessGateEnabled,
+      authUrl,
+    })
+  }
+
+  const accessToken = await refreshAccessTokenIfNeeded(token)
+  if (!accessToken) {
+    return json(200, {
+      ok: true,
+      connected: false,
+      allowed: !accessGateEnabled,
+      accessGateEnabled,
+      authUrl,
+    })
+  }
+
+  const email = await fetchGoogleEmail(accessToken)
+  const allowed = !accessGateEnabled || Boolean(email && allowedEmails.has(email))
+
+  return json(200, {
+    ok: true,
+    connected: true,
+    allowed,
+    accessGateEnabled,
+    email,
+    authUrl,
+    message: allowed ? undefined : 'account_not_allowed',
+  })
 }
 
 async function exchangeCode(request: Request, code: string) {
@@ -82,11 +186,20 @@ async function exchangeCode(request: Request, code: string) {
     'Max-Age=2592000',
   ].join('; ')
 
+  const accessToken = String(token.access_token ?? '')
+  const email = accessToken ? await fetchGoogleEmail(accessToken) : ''
+  const allowedEmails = allowedEmailsSet()
+  const accessGateEnabled = allowedEmails.size > 0
+  const allowed = !accessGateEnabled || Boolean(email && allowedEmails.has(email))
+  const location = allowed
+    ? `${getOrigin(request)}/?googleCalendar=connected`
+    : `${getOrigin(request)}/?googleCalendar=not-allowed`
+
   return new Response(null, {
     status: 302,
     headers: {
       'Set-Cookie': cookie,
-      Location: `${getOrigin(request)}/?googleCalendar=connected`,
+      Location: location,
       'Cache-Control': 'no-store',
     },
   })
@@ -97,14 +210,6 @@ export default {
     const url = new URL(request.url)
     const code = url.searchParams.get('code')
     if (code) return exchangeCode(request, code)
-
-    const authUrl = buildAuthUrl(request)
-    if (!authUrl) return json(500, { ok: false, connected: false, error: 'missing_google_client_id' })
-
-    return json(200, {
-      ok: true,
-      connected: Boolean(getTokenCookie(request)),
-      authUrl,
-    })
+    return accessStatus(request)
   },
 }

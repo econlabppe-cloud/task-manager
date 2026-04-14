@@ -6,6 +6,9 @@ interface Props {
   darkMode: boolean
   onViewChange: (mode: ViewMode) => void
   onDarkModeToggle: () => void
+  googleAuthUrl?: string
+  calendarSyncing?: boolean
+  onCalendarSync?: () => void
 }
 
 const VIEWS: { mode: ViewMode; label: string; icon: React.ReactNode }[] = [
@@ -47,7 +50,7 @@ const VIEWS: { mode: ViewMode; label: string; icon: React.ReactNode }[] = [
   },
 ]
 
-export const Header: React.FC<Props> = ({ viewMode, darkMode, onViewChange, onDarkModeToggle }) => {
+export const Header: React.FC<Props> = ({ viewMode, darkMode, onViewChange, onDarkModeToggle, googleAuthUrl, calendarSyncing, onCalendarSync }) => {
   const headerBg = darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
   const logoText = darkMode ? 'text-gray-100' : 'text-gray-900'
   const mutedText = darkMode ? 'text-gray-500' : 'text-gray-400'
@@ -97,6 +100,34 @@ export const Header: React.FC<Props> = ({ viewMode, darkMode, onViewChange, onDa
 
       {/* Right controls */}
       <div className="flex items-center gap-2">
+        {/* Google Calendar sync — desktop only */}
+        {(googleAuthUrl || calendarSyncing !== undefined) && (
+          <div className="hidden sm:flex items-center gap-1.5">
+            <a
+              href={googleAuthUrl || undefined}
+              className={`text-xs font-semibold px-3 py-1.5 rounded border transition-colors ${
+                googleAuthUrl
+                  ? darkMode
+                    ? 'bg-sky-800 border-sky-700 text-sky-100 hover:bg-sky-700'
+                    : 'bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100'
+                  : darkMode
+                    ? 'bg-gray-700 border-gray-600 text-gray-500 pointer-events-none'
+                    : 'bg-gray-100 border-gray-200 text-gray-400 pointer-events-none'
+              }`}
+            >
+              חבר יומן
+            </a>
+            <button
+              type="button"
+              onClick={onCalendarSync}
+              disabled={calendarSyncing}
+              className="text-xs font-semibold px-3 py-1.5 rounded border transition-colors bg-emerald-700 border-emerald-700 text-white hover:bg-emerald-800 disabled:bg-gray-300 disabled:border-gray-300"
+            >
+              {calendarSyncing ? 'מסנכרן...' : 'סנכרן יומן'}
+            </button>
+          </div>
+        )}
+
         {/* Dark mode toggle */}
         <button
           onClick={onDarkModeToggle}

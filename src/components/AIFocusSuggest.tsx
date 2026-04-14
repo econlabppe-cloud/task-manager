@@ -101,6 +101,11 @@ export const AIFocusSuggest: React.FC<Props> = ({ groups, darkMode }) => {
           <p className={`${textMuted} leading-5`}>
             לחצו על "הצע לי" — אנחנו ננתח את המשימות הפתוחות ונגיד לכם מה הכי כדאי לקדם ברגע זה.
           </p>
+          {!hasApiKey && (
+            <p className={`mt-2 ${textMuted}`}>
+              AI לא פעיל כי <code>VITE_GEMINI_API_KEY</code> לא הוגדר בסביבת הפריסה.
+            </p>
+          )}
         </div>
       )}
 

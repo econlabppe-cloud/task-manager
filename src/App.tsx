@@ -10,6 +10,7 @@ import { requestNotificationPermission, checkDueTasks } from './notifications'
 import { useBridgeSync } from './hooks/useBridgeSync'
 import { useGoogleCalendarSync } from './hooks/useGoogleCalendarSync'
 import { useGoogleCalendarAutoSync } from './hooks/useGoogleCalendarAutoSync'
+import { fetchGoogleCalendarAuthStatus } from './googleCalendarSync'
 import { useAssistantCapture } from './hooks/useAssistantCapture'
 import { useShoppingList } from './hooks/useShoppingList'
 import { useConfetti, ConfettiOverlay } from './hooks/useConfetti'
@@ -38,6 +39,10 @@ export default function App() {
   const [state, setState] = React.useState<BoardState>(() => loadState())
   const [showTools, setShowTools] = React.useState(false)
   const [storageWarning, setStorageWarning] = React.useState(false)
+  const [accessGateEnabled, setAccessGateEnabled] = React.useState(false)
+  const [allowedAccess, setAllowedAccess] = React.useState(true)
+  const [authChecked, setAuthChecked] = React.useState(false)
+  const [signedEmail, setSignedEmail] = React.useState('')
 
   // Custom hooks
   const bridgeStatus = useBridgeSync(setState)
@@ -123,6 +128,18 @@ export default function App() {
     const t = setTimeout(() => checkDueTasks(state.groups), 2500)
     return () => clearTimeout(t)
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ── Access gate check ───────────────────────────────────────────
+  React.useEffect(() => {
+    void fetchGoogleCalendarAuthStatus()
+      .then(status => {
+        setAccessGateEnabled(Boolean(status.accessGateEnabled))
+        setAllowedAccess(status.allowed !== false)
+        setSignedEmail(status.email ?? '')
+        setAuthChecked(true)
+      })
+      .catch(() => { setAuthChecked(true) })
   }, [])
 
   // ── Global shortcut Ctrl+K ───────────────────────────────────────
@@ -246,9 +263,37 @@ export default function App() {
   const mainBg = dm ? 'bg-gray-900' : 'bg-gray-50'
   const toolsBg = dm ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'
 
+  if (accessGateEnabled && authChecked && !allowedAccess) {
+    return (
+      <div className={`min-h-screen ${pageBg} flex items-center justify-center p-4`} dir="rtl">
+        <div className={`w-full max-w-md rounded-xl border p-6 ${dm ? 'bg-gray-900 border-gray-700 text-gray-100' : 'bg-white border-gray-200 text-gray-900'}`}>
+          <h1 className="text-lg font-bold mb-2">גישה פרטית למאנדי בית</h1>
+          <p className={`${dm ? 'text-gray-300' : 'text-gray-600'} text-sm leading-6`}>
+            הגישה זמינה רק לחשבונות Google שאושרו מראש.
+            {signedEmail ? ` החשבון הנוכחי: ${signedEmail}` : ''}
+          </p>
+          <a
+            href={googleSyncState.authUrl || undefined}
+            className={`mt-4 inline-flex items-center justify-center rounded px-4 py-2 text-sm font-semibold transition-colors ${googleSyncState.authUrl ? 'bg-sky-700 text-white hover:bg-sky-800' : 'bg-gray-200 text-gray-400 pointer-events-none'}`}
+          >
+            התחברות עם גוגל
+          </a>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={`flex flex-col h-screen overflow-hidden max-w-full ${pageBg}`} dir="rtl">
-      <Header viewMode={state.viewMode} darkMode={dm} onViewChange={setViewMode} onDarkModeToggle={toggleDarkMode} />
+      <Header
+        viewMode={state.viewMode}
+        darkMode={dm}
+        onViewChange={setViewMode}
+        onDarkModeToggle={toggleDarkMode}
+        googleAuthUrl={googleSyncState.authUrl}
+        calendarSyncing={googleSyncState.isSyncing}
+        onCalendarSync={() => { void googleSyncControls.manualSync() }}
+      />
 
       {/* Storage quota warning banner */}
       {storageWarning && (
@@ -377,7 +422,14 @@ export default function App() {
           )}
 
           {state.viewMode === 'calendar' && (
-            <CalendarView groups={state.groups} darkMode={dm} onUpdateTask={updateTask} />
+            <CalendarView
+              groups={state.groups}
+              darkMode={dm}
+              onUpdateTask={updateTask}
+              googleAuthUrl={googleSyncState.authUrl}
+              calendarSyncing={googleSyncState.isSyncing}
+              onCalendarSync={() => { void googleSyncControls.manualSync() }}
+            />
           )}
 
           {state.viewMode === 'analytics' && (
