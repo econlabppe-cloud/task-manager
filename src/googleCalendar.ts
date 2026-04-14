@@ -40,7 +40,7 @@ export function googleCalendarUrl({ task, groupTitle }: CalendarTask): string {
     task.assignee ? `אחראי: ${task.assignee}` : '',
     `עדיפות: ${task.priority}`,
     task.notes ? `הערות: ${task.notes}` : '',
-    "נוצר מתוך צ'ק ליסט בית.",
+    'נוצר מתוך מאנדי בית.',
   ].filter(Boolean).join('\n')
 
   const params = new URLSearchParams({
@@ -53,7 +53,7 @@ export function googleCalendarUrl({ task, groupTitle }: CalendarTask): string {
   return `https://calendar.google.com/calendar/render?${params.toString()}`
 }
 
-export function tasksToIcs(tasks: CalendarTask[], calendarName = "צ'ק ליסט בית"): string {
+export function tasksToIcs(tasks: CalendarTask[], calendarName = 'מאנדי בית'): string {
   const stamp = nowStamp()
   const events = tasks
     .filter(({ task }) => task.dueDate)

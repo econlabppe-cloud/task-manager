@@ -183,7 +183,7 @@ async function handleWhatsAppPost(req, res) {
       externalId: message.messageId,
     })
     if (item) captured.push(item)
-    await sendWhatsAppReply(message.from, `קיבלתי לצ'ק ליסט בית: ${message.text}`)
+    await sendWhatsAppReply(message.from, `קיבלתי למאנדי בית: ${message.text}`)
   }
 
   sendJson(res, req, 200, { ok: true, captured: captured.length })

@@ -53,7 +53,7 @@ export const IntegrationHub: React.FC<Props> = ({
   const sendTest = async () => {
     try {
       await captureExternalTask(testText, 'shortcut')
-      setMessage("נשלח לגשר. צ'ק ליסט בית ימשוך את זה כמשימה חכמה בעוד רגע.")
+      setMessage('נשלח לגשר. מאנדי בית ימשוך את זה כמשימה חכמה בעוד רגע.')
     } catch {
       setMessage('הגשר לא מחובר. הפעילו npm run bridge בחלון נפרד.')
     }
