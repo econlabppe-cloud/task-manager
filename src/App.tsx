@@ -247,7 +247,7 @@ export default function App() {
   const toolsBg = dm ? 'bg-gray-900 border-gray-700' : 'bg-gray-50 border-gray-200'
 
   return (
-    <div className={`flex flex-col h-screen overflow-hidden ${pageBg}`} dir="rtl">
+    <div className={`flex flex-col h-screen overflow-hidden max-w-full ${pageBg}`} dir="rtl">
       <Header viewMode={state.viewMode} darkMode={dm} onViewChange={setViewMode} onDarkModeToggle={toggleDarkMode} />
 
       {/* Storage quota warning banner */}
@@ -332,7 +332,7 @@ export default function App() {
       </div>
 
       {/* Main */}
-      <main className={`flex-1 overflow-y-auto ${mainBg} pb-20 sm:pb-0`}>
+      <main className={`flex-1 overflow-y-auto overflow-x-hidden ${mainBg} pb-20 sm:pb-0`}>
         <div className="max-w-6xl mx-auto px-4 py-5">
 
           {state.viewMode === 'board' && (

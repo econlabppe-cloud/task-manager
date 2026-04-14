@@ -66,8 +66,8 @@ export const Header: React.FC<Props> = ({ viewMode, darkMode, onViewChange, onDa
 
       <div className={`w-px h-6 ${darkMode ? 'bg-gray-700' : 'bg-gray-200'} mx-1 hidden sm:block`} />
 
-      {/* View switcher */}
-      <nav aria-label="מצב תצוגה" className="flex items-center gap-1 bg-transparent">
+      {/* View switcher — hidden on mobile (bottom nav handles it) */}
+      <nav aria-label="מצב תצוגה" className="hidden sm:flex items-center gap-1 bg-transparent">
         {VIEWS.map(({ mode, label, icon }) => {
           const isActive = viewMode === mode
           return (

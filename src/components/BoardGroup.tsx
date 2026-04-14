@@ -140,23 +140,21 @@ export const BoardGroup: React.FC<Props> = ({
           />
         ) : (
           <h3
-            className={`text-base font-bold ${headerText} cursor-pointer hover:opacity-75 transition-opacity`}
+            className={`text-base font-bold ${headerText} cursor-pointer hover:opacity-75 transition-opacity flex-1 min-w-0 truncate`}
             onDoubleClick={() => { setEditingTitle(true); setTitleDraft(group.title) }}
-            title="לחץ פעמיים לשינוי שם"
+            title={group.title}
           >
             {group.title}
           </h3>
         )}
 
         {/* Count badge */}
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${darkMode ? 'bg-white/10 text-white/70' : 'bg-white/50 text-current opacity-80'}`}>
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${darkMode ? 'bg-white/10 text-white/70' : 'bg-white/50 text-current opacity-80'}`}>
           {doneCount}/{filteredTasks.length}
           {(filterAssignee || filterStatus) && group.tasks.length !== filteredTasks.length && (
             <span className="opacity-60"> ({group.tasks.length})</span>
           )}
         </span>
-
-        <div className="flex-1" />
 
         {/* Delete */}
         {confirmDelete ? (
