@@ -75,6 +75,9 @@ export function useGoogleCalendarSync(
                 ...task,
                 title: updated.title ?? task.title,
                 dueDate: updated.dueDate ?? task.dueDate,
+                ...(updated.startTime !== undefined
+                  ? { startTime: updated.startTime }
+                  : {}),
                 notes: googleEventToTaskDefaults(updated).notes ?? task.notes,
                 externalUpdatedAt: updated.updatedAt ?? task.externalUpdatedAt,
               }

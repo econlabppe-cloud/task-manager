@@ -4,6 +4,7 @@ export interface GoogleCalendarEventTask {
   id: string
   title: string
   dueDate: string
+  startTime?: string   // "HH:MM" — present only for timed events, absent for all-day
   notes: string
   updatedAt?: string
 }
@@ -70,6 +71,7 @@ export function googleEventToTaskDefaults(event: GoogleCalendarEventTask): Parti
     status: 'לא התחיל',
     priority: 'בינוני',
     dueDate: event.dueDate,
+    ...(event.startTime ? { startTime: event.startTime } : {}),
     notes: event.notes ? `יובא מיומן Google:\n${event.notes}` : 'יובא מיומן Google.',
     externalSource: 'google-calendar',
     externalId: event.id,

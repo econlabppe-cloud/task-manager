@@ -10,6 +10,8 @@ import { requestNotificationPermission, checkDueTasks } from './notifications'
 import { useBridgeSync } from './hooks/useBridgeSync'
 import { useGoogleCalendarSync } from './hooks/useGoogleCalendarSync'
 import { useGoogleCalendarAutoSync } from './hooks/useGoogleCalendarAutoSync'
+import { useAssistantCapture } from './hooks/useAssistantCapture'
+import { useShoppingList } from './hooks/useShoppingList'
 import { useConfetti, ConfettiOverlay } from './hooks/useConfetti'
 import { useStreak } from './hooks/useStreak'
 import { GROUP_COLORS } from './constants'
@@ -23,6 +25,7 @@ import { RecurringRoutines } from './components/RecurringRoutines'
 import { IntegrationHub } from './components/IntegrationHub'
 import { CalendarView } from './components/CalendarView'
 import { AnalyticsPanel } from './components/AnalyticsPanel'
+import { ShoppingListView } from './components/ShoppingListView'
 import { ExportImport } from './components/ExportImport'
 import { MobileBottomNav } from './components/MobileBottomNav'
 import { AIFocusSuggest } from './components/AIFocusSuggest'
@@ -40,6 +43,45 @@ export default function App() {
   const bridgeStatus = useBridgeSync(setState)
   const syncGoogleCalendar = useGoogleCalendarSync(setState)
   const [googleSyncState, googleSyncControls] = useGoogleCalendarAutoSync(setState, syncGoogleCalendar)
+  const shopping = useShoppingList()
+
+  // Google Assistant capture — items that say "לרשימת קניות" go to shopping; rest to board
+  const handleAssistantCapture = React.useCallback((items: { text: string }[]) => {
+    for (const { text } of items) {
+      const isShoppingIntent = /קניות|לקנות|לקנייה|סופרמרקט/.test(text)
+      if (isShoppingIntent) {
+        // Strip the intent phrase and add to shopping list
+        const item = text.replace(/הוסף(י)?\s*(ל)?רשימת\s*קניות|הכנס(י)?\s*(ל)?רשימה|לקנות\s*/gi, '').trim()
+        if (item) shopping.addItem(item)
+      } else {
+        // Add to board as a task in the first group (same as bridge captures)
+        setState(s => {
+          if (s.groups.length === 0) return s
+          const firstGroup = s.groups[0]
+          const newTask: Task = {
+            id: 'task-asst-' + Math.random().toString(36).slice(2),
+            title: text.slice(0, 500),
+            assignee: '' as Assignee,
+            status: 'לא התחיל' as Status,
+            priority: 'בינוני' as Priority,
+            dueDate: '', notes: '', recurring: 'none',
+            subtasks: [], tags: [],
+            order: firstGroup.tasks.length,
+            createdAt: new Date().toISOString(),
+            externalSource: 'api',
+          }
+          return {
+            ...s,
+            groups: s.groups.map(g =>
+              g.id === firstGroup.id ? { ...g, tasks: [...g.tasks, newTask] } : g
+            ),
+          }
+        })
+      }
+    }
+  }, [shopping, setState])
+
+  useAssistantCapture(handleAssistantCapture)
 
   // Confetti
   const [confettiParticles, fireConfetti] = useConfetti()
@@ -340,6 +382,10 @@ export default function App() {
 
           {state.viewMode === 'analytics' && (
             <AnalyticsPanel groups={state.groups} darkMode={dm} />
+          )}
+
+          {state.viewMode === 'shopping' && (
+            <ShoppingListView darkMode={dm} />
           )}
         </div>
       </main>

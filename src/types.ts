@@ -3,7 +3,7 @@ export type Priority = 'נמוך' | 'בינוני' | 'גבוה'
 export type Assignee = 'יהודה' | 'אשתי' | 'שנינו' | 'ילדים' | ''
 export type RecurringType = 'none' | 'daily' | 'weekly' | 'monthly'
 export type RecurrenceCadence = 'daily' | 'weekly'
-export type ViewMode = 'board' | 'calendar' | 'analytics'
+export type ViewMode = 'board' | 'calendar' | 'analytics' | 'shopping'
 
 export interface Subtask {
   id: string
@@ -39,6 +39,7 @@ export interface Task {
   // v3 additions
   reactions?: Record<string, number>  // emoji → reaction count
   completedAt?: string                // ISO timestamp when status became 'הושלם'
+  startTime?: string                  // "HH:MM" (24h) for time-grid display; absent = unscheduled
 }
 
 export type NewTaskDefaults = Partial<Omit<Task, 'id' | 'title' | 'createdAt' | 'subtasks' | 'tags' | 'order'>>

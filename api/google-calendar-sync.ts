@@ -36,16 +36,21 @@ function unfoldIcs(raw: string) {
   return raw.replace(/\r?\n[ \t]/g, '')
 }
 
-function parseIcsDate(value: string) {
+function parseIcsDate(value: string): string {
   if (!value) return ''
-
   const dateOnly = value.match(/^(\d{4})(\d{2})(\d{2})$/)
   if (dateOnly) return `${dateOnly[1]}-${dateOnly[2]}-${dateOnly[3]}`
-
   const dateTime = value.match(/^(\d{4})(\d{2})(\d{2})T/)
   if (dateTime) return `${dateTime[1]}-${dateTime[2]}-${dateTime[3]}`
-
   return ''
+}
+
+function parseIcsTime(value: string): string | undefined {
+  // DTSTART:20231015T140000 → "14:00"
+  // DTSTART:20231015T140000Z → "14:00"
+  // DTSTART:20231015 → undefined (all-day)
+  const m = value.match(/^\d{8}T(\d{2})(\d{2})/)
+  return m ? `${m[1]}:${m[2]}` : undefined
 }
 
 function unescapeIcs(value: string) {
@@ -83,10 +88,12 @@ function parseEvents(rawIcs: string) {
       const endRaw = fieldValue(lines, 'DTEND')
       const dueDate = parseIcsDate(startRaw)
 
+      const startTime = parseIcsTime(startRaw)
       return {
         id: uid || `${summary}-${startRaw}`,
         title: summary || 'אירוע מהיומן',
         dueDate,
+        startTime,
         notes: [
           description,
           location ? `מיקום: ${location}` : '',
@@ -140,12 +147,18 @@ async function getAccessToken(request: Request): Promise<string | null> {
 }
 
 function googleEventToTask(event: Record<string, any>) {
-  const start = event.start?.date || String(event.start?.dateTime ?? '').slice(0, 10)
+  // event.start.date = "2023-10-15" (all-day)
+  // event.start.dateTime = "2023-10-15T14:00:00+03:00" (timed event)
+  const rawDateTime: string = event.start?.dateTime ?? ''
+  const start = event.start?.date || rawDateTime.slice(0, 10)
+  // Extract "HH:MM" from the dateTime string (already in local time from Google API)
+  const startTime: string | undefined = rawDateTime ? rawDateTime.slice(11, 16) : undefined
   const description = String(event.description ?? '')
   return {
     id: String(event.id),
     title: String(event.summary || 'אירוע מהיומן'),
     dueDate: start,
+    startTime,
     notes: description.replace(/\n\nנוצר ממאנדי בית\.[\s\S]*$/m, '').trim(),
     updatedAt: String(event.updated ?? ''),
   }
