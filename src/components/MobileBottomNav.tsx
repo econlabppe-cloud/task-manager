@@ -25,6 +25,11 @@ const navItems: Array<{ mode: ViewMode; label: string; path: string }> = [
     label: 'ניתוח',
     path: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
   },
+  {
+    mode: 'shopping',
+    label: 'קניות',
+    path: 'M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z',
+  },
 ]
 
 export const MobileBottomNav: React.FC<Props> = ({ viewMode, toolsOpen, onViewChange, onToolsToggle, darkMode }) => {
@@ -32,7 +37,7 @@ export const MobileBottomNav: React.FC<Props> = ({ viewMode, toolsOpen, onViewCh
     <nav className={`sm:hidden fixed bottom-0 inset-x-0 z-40 border-t px-2 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 ${
       darkMode ? 'bg-gray-950/95 border-gray-800' : 'bg-white/95 border-gray-200'
     }`}>
-      <div className="grid grid-cols-4 gap-1">
+      <div className="grid grid-cols-5 gap-1">
         {navItems.map(item => {
           const active = viewMode === item.mode && !toolsOpen
           return (

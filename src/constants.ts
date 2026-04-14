@@ -37,6 +37,12 @@ export const MAX_GROUP_TITLE_LENGTH = 100
 /** Maximum allowed characters for a capture text */
 export const MAX_CAPTURE_TEXT_LENGTH = 2_000
 
+/** How often (ms) to auto-sync Google Calendar when connected — 5 minutes */
+export const GOOGLE_SYNC_INTERVAL_MS = 5 * 60 * 1000
+
+/** localStorage key for Google Calendar auto-sync state */
+export const GOOGLE_SYNC_PREFS_KEY = 'mandy-google-sync-v1'
+
 /** Fixed group title used for Google-Calendar-imported events */
 export const GOOGLE_CALENDAR_GROUP_TITLE = 'יומן גוגל'
 

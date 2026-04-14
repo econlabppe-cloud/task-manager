@@ -164,13 +164,16 @@ async function fetchGoogleEmail(accessToken: string) {
 }
 
 function googleEventToTask(event: Record<string, any>) {
-  const start = event.start?.date || String(event.start?.dateTime ?? '').slice(0, 10)
+  const rawDateTime: string = event.start?.dateTime ?? ''
+  const start = event.start?.date || rawDateTime.slice(0, 10)
+  const startTime: string | undefined = rawDateTime ? rawDateTime.slice(11, 16) : undefined
   const description = String(event.description ?? '')
   return {
     id: String(event.id),
     title: String(event.summary || 'אירוע מהיומן'),
     dueDate: start,
-    notes: description.replace(/\n\nנוצר מצ'ק ליסט בית\.[\s\S]*$/m, '').trim(),
+    startTime,
+    notes: description.replace(/\n\nנוצר (מצ'ק ליסט בית|ממאנדי בית)\.[\s\S]*$/m, '').trim(),
     updatedAt: String(event.updated ?? ''),
   }
 }
