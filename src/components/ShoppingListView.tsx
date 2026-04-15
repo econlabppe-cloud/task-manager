@@ -51,7 +51,7 @@ function AddItemForm({
           aria-label="שם מוצר"
         />
       </div>
-      <div className="w-28">
+      <div className="w-full sm:w-28">
         <label className={`block text-[11px] font-medium mb-1 ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
           כמות
         </label>
@@ -64,7 +64,7 @@ function AddItemForm({
           aria-label="כמות"
         />
       </div>
-      <div className="w-32">
+      <div className="w-full sm:w-32">
         <label className={`block text-[11px] font-medium mb-1 ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
           קטגוריה
         </label>
@@ -320,7 +320,7 @@ export const ShoppingListView: React.FC<Props> = ({ darkMode }) => {
                   <button
                     type="button"
                     onClick={() => deleteCustomRecipe(recipe.id)}
-                    className={`absolute top-1 left-1 text-[10px] opacity-0 group-hover:opacity-100 ${darkMode ? 'text-gray-600 hover:text-red-400' : 'text-gray-300 hover:text-red-400'}`}
+                    className={`absolute top-1 left-1 w-6 h-6 flex items-center justify-center rounded-full text-[11px] transition-colors ${darkMode ? 'text-gray-500 hover:bg-red-900/50 hover:text-red-400' : 'text-gray-400 hover:bg-red-50 hover:text-red-500'}`}
                     aria-label="מחק מתכון"
                     title="מחק מתכון"
                   >
@@ -381,7 +381,7 @@ export const ShoppingListView: React.FC<Props> = ({ darkMode }) => {
                         type="checkbox"
                         checked={item.checked}
                         onChange={() => toggleItem(item.id)}
-                        className="w-4 h-4 accent-cyan-600 cursor-pointer"
+                        className="w-5 h-5 accent-cyan-600 cursor-pointer shrink-0"
                         aria-label={`סמן ${item.name}`}
                       />
                       <span className={`flex-1 font-medium ${item.checked ? 'line-through' : ''} ${textMain}`}>
@@ -398,10 +398,12 @@ export const ShoppingListView: React.FC<Props> = ({ darkMode }) => {
                       <button
                         type="button"
                         onClick={() => deleteItem(item.id)}
-                        className={`text-xs transition-colors ${darkMode ? 'text-gray-700 hover:text-red-400' : 'text-gray-300 hover:text-red-400'}`}
+                        className={`p-1.5 rounded-lg transition-colors shrink-0 touch-manipulation ${darkMode ? 'text-gray-500 hover:bg-red-900/40 hover:text-red-400' : 'text-gray-400 hover:bg-red-50 hover:text-red-500'}`}
                         aria-label="הסר פריט"
                       >
-                        ✕
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                       </button>
                     </li>
                   ))}

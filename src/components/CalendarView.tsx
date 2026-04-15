@@ -129,141 +129,223 @@ export const CalendarView: React.FC<Props> = ({ groups, darkMode, onUpdateTask, 
 
   return (
     <div className="space-y-4">
-      <div className={`flex items-center justify-between gap-3 px-4 py-3 rounded-xl border ${bg}`}>
-        <button
-          onClick={() => setWeekOffset(offset => offset - 1)}
-          className={`p-1.5 rounded-lg transition-colors ${darkMode ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-100 text-gray-600'}`}
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-
-        <div className="text-center min-w-0">
-          <h2 className={`font-semibold ${textMain}`}>{weekTitle(weekOffset)}</h2>
-          <p className={`text-xs ${textMuted}`}>
-            {days[0].date.toLocaleDateString('he-IL', { day: 'numeric', month: 'long' })} -{' '}
-            {days[6].date.toLocaleDateString('he-IL', { day: 'numeric', month: 'long', year: 'numeric' })}
-          </p>
-        </div>
-
+      {/* ── Navigation bar ────────────────────────────────────────── */}
+      <div className={`px-4 py-3 rounded-xl border ${bg}`}>
+        {/* Row 1: prev / title / next */}
         <div className="flex items-center gap-2">
-          {googleConnected ? (
-            <>
-              <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs ${
-                darkMode ? 'bg-gray-800 border-gray-600 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-600'
-              }`}>
-                <GoogleG className="w-3.5 h-3.5 shrink-0" />
-                <span className="max-w-[130px] truncate">{googleEmail || 'מחובר'}</span>
-                <button
-                  type="button"
-                  onClick={onGoogleDisconnect}
-                  title="התנתק מגוגל"
-                  className={`mr-0.5 rounded p-0.5 transition-colors ${darkMode ? 'text-gray-500 hover:bg-red-900/40 hover:text-red-400' : 'text-gray-400 hover:bg-red-100 hover:text-red-600'}`}
-                  aria-label="התנתק מגוגל"
-                >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <button
-                type="button"
-                onClick={onCalendarSync}
-                disabled={calendarSyncing}
-                className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
-                  darkMode
-                    ? 'bg-emerald-900/60 border-emerald-700 text-emerald-300 hover:bg-emerald-800/60 disabled:bg-gray-700 disabled:border-gray-600 disabled:text-gray-500'
-                    : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 disabled:bg-gray-100 disabled:border-gray-200 disabled:text-gray-400'
-                }`}
-              >
-                {calendarSyncing ? (
-                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                  </svg>
-                ) : (
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                )}
-                {calendarSyncing ? 'מסנכרן...' : 'סנכרן'}
-              </button>
-            </>
-          ) : googleAuthUrl ? (
-            <a
-              href={googleAuthUrl}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium transition-all shadow-sm hover:shadow ${
-                darkMode
-                  ? 'bg-gray-800 border-gray-600 text-gray-100 hover:bg-gray-700'
-                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
-            >
-              <GoogleG className="w-4 h-4 shrink-0" />
-              <span>התחבר עם Google</span>
-            </a>
-          ) : null}
           <button
-            type="button"
-            onClick={exportWeek}
-            disabled={weekTasks.length === 0}
-            className={`text-xs font-semibold px-3 py-1.5 rounded border transition-colors ${
-              darkMode
-                ? 'bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600 disabled:text-gray-500'
-                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 disabled:text-gray-300'
-            }`}
+            onClick={() => setWeekOffset(offset => offset - 1)}
+            className={`p-2 rounded-lg transition-colors touch-manipulation ${darkMode ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-100 text-gray-600'}`}
+            aria-label="שבוע קודם"
           >
-            ייצוא ליומן
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
           </button>
+
+          <div className="flex-1 text-center min-w-0">
+            <h2 className={`font-semibold ${textMain}`}>{weekTitle(weekOffset)}</h2>
+            <p className={`text-xs ${textMuted}`}>
+              {days[0].date.toLocaleDateString('he-IL', { day: 'numeric', month: 'long' })} –{' '}
+              {days[6].date.toLocaleDateString('he-IL', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </p>
+          </div>
+
+          {/* Today button — only when not current week */}
           {weekOffset !== 0 && (
             <button
               onClick={() => setWeekOffset(0)}
-              className={`text-xs px-2 py-1 rounded-lg transition-colors ${darkMode ? 'text-cyan-400 hover:bg-gray-700' : 'text-cyan-700 hover:bg-cyan-50'}`}
+              className={`hidden sm:block text-xs px-2.5 py-1.5 rounded-lg transition-colors ${darkMode ? 'text-cyan-400 hover:bg-gray-700' : 'text-cyan-700 hover:bg-cyan-50'}`}
             >
               היום
             </button>
           )}
+
+          {/* Desktop: Google controls + export */}
+          <div className="hidden sm:flex items-center gap-2">
+            {googleConnected ? (
+              <>
+                <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs ${
+                  darkMode ? 'bg-gray-800 border-gray-600 text-gray-300' : 'bg-gray-50 border-gray-200 text-gray-600'
+                }`}>
+                  <GoogleG className="w-3.5 h-3.5 shrink-0" />
+                  <span className="max-w-[120px] truncate">{googleEmail || 'מחובר'}</span>
+                  <button
+                    type="button"
+                    onClick={onGoogleDisconnect}
+                    title="התנתק מגוגל"
+                    className={`mr-0.5 rounded p-0.5 transition-colors ${darkMode ? 'text-gray-500 hover:bg-red-900/40 hover:text-red-400' : 'text-gray-400 hover:bg-red-100 hover:text-red-600'}`}
+                    aria-label="התנתק מגוגל"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={onCalendarSync}
+                  disabled={calendarSyncing}
+                  className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
+                    darkMode
+                      ? 'bg-emerald-900/60 border-emerald-700 text-emerald-300 hover:bg-emerald-800/60 disabled:bg-gray-700 disabled:border-gray-600 disabled:text-gray-500'
+                      : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 disabled:bg-gray-100 disabled:border-gray-200 disabled:text-gray-400'
+                  }`}
+                >
+                  {calendarSyncing ? (
+                    <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                  ) : (
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  )}
+                  {calendarSyncing ? 'מסנכרן...' : 'סנכרן'}
+                </button>
+              </>
+            ) : googleAuthUrl ? (
+              <a
+                href={googleAuthUrl}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium transition-all shadow-sm hover:shadow ${
+                  darkMode ? 'bg-gray-800 border-gray-600 text-gray-100 hover:bg-gray-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <GoogleG className="w-4 h-4 shrink-0" />
+                <span>התחבר עם Google</span>
+              </a>
+            ) : null}
+            <button
+              type="button"
+              onClick={exportWeek}
+              disabled={weekTasks.length === 0}
+              className={`text-xs font-semibold px-3 py-1.5 rounded border transition-colors ${
+                darkMode ? 'bg-gray-700 border-gray-600 text-gray-200 hover:bg-gray-600 disabled:text-gray-500' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 disabled:text-gray-300'
+              }`}
+            >
+              ייצוא ליומן
+            </button>
+          </div>
+
           <button
             onClick={() => setWeekOffset(offset => offset + 1)}
-            className={`p-1.5 rounded-lg transition-colors ${darkMode ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-100 text-gray-600'}`}
+            className={`p-2 rounded-lg transition-colors touch-manipulation ${darkMode ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-100 text-gray-600'}`}
+            aria-label="שבוע הבא"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
         </div>
-      </div>
 
-      <div className={`rounded-xl border p-3 ${bg}`}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h3 className={`text-sm font-bold ${textMain}`}>לוח שבועי</h3>
-            <p className={`text-xs mt-1 ${textMuted}`}>
-              {openWeekTasks.length} פתוחות השבוע מתוך {weekTasks.length} משימות עם תאריך.
-            </p>
+        {/* Row 2: mobile-only compact actions */}
+        <div className={`flex sm:hidden items-center justify-between gap-2 mt-2 pt-2 border-t ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
+          <div className="flex items-center gap-2">
+            {googleConnected ? (
+              <>
+                <div className={`flex items-center gap-1.5 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  <GoogleG className="w-3.5 h-3.5 shrink-0" />
+                  <span className="max-w-[100px] truncate">{googleEmail || 'מחובר'}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={onCalendarSync}
+                  disabled={calendarSyncing}
+                  title={calendarSyncing ? 'מסנכרן...' : 'סנכרן יומן'}
+                  className={`p-2 rounded-lg border transition-colors touch-manipulation ${
+                    darkMode ? 'border-emerald-700 text-emerald-400 hover:bg-emerald-900/40 disabled:text-gray-600 disabled:border-gray-700' : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50 disabled:text-gray-300 disabled:border-gray-200'
+                  }`}
+                  aria-label="סנכרן יומן"
+                >
+                  {calendarSyncing ? (
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  )}
+                </button>
+              </>
+            ) : googleAuthUrl ? (
+              <a
+                href={googleAuthUrl}
+                className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-all ${
+                  darkMode ? 'bg-gray-800 border-gray-600 text-gray-200 hover:bg-gray-700' : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <GoogleG className="w-3.5 h-3.5 shrink-0" />
+                <span>חבר יומן</span>
+              </a>
+            ) : null}
           </div>
-          <div className={`text-xs rounded border px-3 py-2 ${darkMode ? 'border-cyan-800 bg-cyan-900/20 text-cyan-300' : 'border-cyan-200 bg-cyan-50 text-cyan-800'}`}>
-            Google Calendar: כפתור "Google" פותח יצירת אירוע, ו"ייצוא ליומן" מוריד קובץ ICS.
+
+          <div className="flex items-center gap-2">
+            {weekOffset !== 0 && (
+              <button
+                onClick={() => setWeekOffset(0)}
+                className={`text-xs px-2.5 py-1.5 rounded-lg transition-colors touch-manipulation ${darkMode ? 'text-cyan-400 hover:bg-gray-700' : 'text-cyan-700 hover:bg-cyan-50'}`}
+              >
+                היום
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={exportWeek}
+              disabled={weekTasks.length === 0}
+              title="ייצוא ליומן"
+              className={`p-2 rounded-lg border transition-colors touch-manipulation ${
+                darkMode ? 'border-gray-600 text-gray-400 hover:bg-gray-700 disabled:text-gray-700 disabled:border-gray-800' : 'border-gray-200 text-gray-500 hover:bg-gray-100 disabled:text-gray-300 disabled:border-gray-100'
+              }`}
+              aria-label="ייצוא ליומן"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-7 gap-2">
+      {/* ── Week summary (desktop hint) ────────────────────────────── */}
+      <div className={`rounded-xl border px-4 py-3 ${bg}`}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className={`text-sm font-medium ${textMain}`}>
+            {openWeekTasks.length} פתוחות השבוע
+            <span className={`text-xs font-normal mr-1 ${textMuted}`}>מתוך {weekTasks.length} עם תאריך</span>
+          </p>
+          <p className={`hidden sm:block text-xs ${textMuted}`}>
+            כפתור "Google" בכרטיסיית המשימה פותח יצירת אירוע ביומן.
+          </p>
+        </div>
+      </div>
+
+      {/* ── 7-day grid ────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-7 gap-2">
         {days.map(day => (
           <div
             key={day.dateStr}
-            className={`rounded-xl border p-2 min-h-[220px] flex flex-col gap-2 ${
+            className={`rounded-xl border p-2 min-h-[100px] sm:min-h-[180px] flex flex-col gap-2 ${
               day.isToday ? todayRing : day.isShabbat ? shabbatBg : dayBg
             }`}
           >
-            <div className="flex md:flex-col items-center justify-between md:justify-start gap-1 border-b border-black/5 pb-2">
-              <span className={`text-xs font-semibold ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                {DAYS_HE[day.date.getDay()]}
-              </span>
-              <span className={`text-xl font-bold leading-tight ${day.isToday ? 'text-cyan-700' : day.isShabbat ? 'text-amber-700' : textMain}`}>
-                {day.date.getDate()}
-              </span>
-              <span className={`text-[11px] ${textMuted}`}>{day.tasks.length} משימות</span>
+            <div className="flex items-center justify-between gap-1 border-b border-black/5 pb-2">
+              <div className="flex items-center gap-2">
+                <span className={`text-xl font-bold leading-tight ${day.isToday ? 'text-cyan-600' : day.isShabbat ? 'text-amber-600' : textMain}`}>
+                  {day.date.getDate()}
+                </span>
+                <span className={`text-xs font-medium ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {DAYS_HE[day.date.getDay()]}
+                </span>
+              </div>
+              {day.tasks.length > 0 && (
+                <span className={`text-[11px] px-1.5 py-0.5 rounded-full ${darkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-500'}`}>
+                  {day.tasks.length}
+                </span>
+              )}
             </div>
 
             {day.tasks.length === 0 ? (
