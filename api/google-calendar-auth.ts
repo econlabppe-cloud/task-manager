@@ -30,6 +30,15 @@ function getRedirectUri(request: Request) {
   return process.env.GOOGLE_REDIRECT_URI || `${getOrigin(request)}/api/google-calendar-auth?callback=1`
 }
 
+function missingConfig() {
+  const missing = [
+    !process.env.GOOGLE_CLIENT_ID ? 'GOOGLE_CLIENT_ID' : '',
+    !process.env.GOOGLE_CLIENT_SECRET ? 'GOOGLE_CLIENT_SECRET' : '',
+    !process.env.GOOGLE_REDIRECT_URI ? 'GOOGLE_REDIRECT_URI' : '',
+  ].filter(Boolean)
+  return missing
+}
+
 function allowedEmailsSet(): Set<string> {
   const raw = process.env.ALLOWED_EMAILS ?? ''
   const emails = raw
@@ -112,9 +121,8 @@ async function fetchGoogleEmail(accessToken: string) {
 
 async function accessStatus(request: Request) {
   const authUrl = buildAuthUrl(request)
-  if (!authUrl) {
-    return json(500, { ok: false, connected: false, allowed: false, error: 'missing_google_client_id' })
-  }
+  const missing = missingConfig()
+  const configured = missing.length === 0
 
   const allowedEmails = allowedEmailsSet()
   const accessGateEnabled = allowedEmails.size > 0
@@ -123,9 +131,12 @@ async function accessStatus(request: Request) {
     return json(200, {
       ok: true,
       connected: false,
+      configured,
       allowed: !accessGateEnabled,
       accessGateEnabled,
+      missingConfig: missing,
       authUrl,
+      message: configured ? undefined : 'google_oauth_not_configured',
     })
   }
 
@@ -134,9 +145,12 @@ async function accessStatus(request: Request) {
     return json(200, {
       ok: true,
       connected: false,
+      configured,
       allowed: !accessGateEnabled,
       accessGateEnabled,
+      missingConfig: missing,
       authUrl,
+      message: configured ? undefined : 'google_oauth_not_configured',
     })
   }
 
@@ -146,11 +160,13 @@ async function accessStatus(request: Request) {
   return json(200, {
     ok: true,
     connected: true,
+    configured,
     allowed,
     accessGateEnabled,
     email,
+    missingConfig: missing,
     authUrl,
-    message: allowed ? undefined : 'account_not_allowed',
+    message: !configured ? 'google_oauth_not_configured' : allowed ? undefined : 'account_not_allowed',
   })
 }
 
@@ -194,6 +210,8 @@ async function exchangeCode(request: Request, code: string) {
   const allowedEmails = allowedEmailsSet()
   const accessGateEnabled = allowedEmails.size > 0
   const allowed = !accessGateEnabled || Boolean(email && allowedEmails.has(email))
+  const missing = missingConfig()
+  const configured = missing.length === 0
   const location = allowed
     ? `${getOrigin(request)}/?googleCalendar=connected`
     : `${getOrigin(request)}/?googleCalendar=not-allowed`
@@ -204,6 +222,7 @@ async function exchangeCode(request: Request, code: string) {
       'Set-Cookie': cookie,
       Location: location,
       'Cache-Control': 'no-store',
+      'X-Google-OAuth-Configured': configured ? '1' : '0',
     },
   })
 }

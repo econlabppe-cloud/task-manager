@@ -1,5 +1,6 @@
 import React from 'react'
 import { ViewMode } from '../types'
+import type { GoogleCalendarAuthStatus } from '../googleCalendarSync'
 
 interface Props {
   viewMode: ViewMode
@@ -7,6 +8,7 @@ interface Props {
   onViewChange: (mode: ViewMode) => void
   onDarkModeToggle: () => void
   googleAuthUrl?: string
+  googleAuthStatus?: GoogleCalendarAuthStatus | null
   calendarSyncing?: boolean
   onCalendarSync?: () => void
 }
@@ -50,14 +52,32 @@ const VIEWS: { mode: ViewMode; label: string; icon: React.ReactNode }[] = [
   },
 ]
 
-export const Header: React.FC<Props> = ({ viewMode, darkMode, onViewChange, onDarkModeToggle, googleAuthUrl, calendarSyncing, onCalendarSync }) => {
+export const Header: React.FC<Props> = ({
+  viewMode,
+  darkMode,
+  onViewChange,
+  onDarkModeToggle,
+  googleAuthUrl,
+  googleAuthStatus,
+  calendarSyncing,
+  onCalendarSync,
+}) => {
   const headerBg = darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'
   const logoText = darkMode ? 'text-gray-100' : 'text-gray-900'
   const mutedText = darkMode ? 'text-gray-500' : 'text-gray-400'
 
+  const oauthConfigured = googleAuthStatus?.configured !== false
+  const missingConfig = googleAuthStatus?.missingConfig ?? []
+  const connectDisabled = !googleAuthUrl || !oauthConfigured
+  const connectLabel = oauthConfigured ? 'חבר יומן' : 'חיבור גוגל לא מוגדר'
+  const connectHint = !oauthConfigured && missingConfig.length > 0
+    ? `חסר: ${missingConfig.join(', ')}`
+    : !googleAuthUrl
+      ? 'יש להגדיר את חיבור Google ב-Vercel'
+      : ''
+
   return (
     <header className={`${headerBg} border-b h-14 flex items-center px-4 gap-3 shrink-0`}>
-      {/* Logo */}
       <div className="flex items-center gap-2 shrink-0">
         <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shrink-0">
           <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -69,7 +89,6 @@ export const Header: React.FC<Props> = ({ viewMode, darkMode, onViewChange, onDa
 
       <div className={`w-px h-6 ${darkMode ? 'bg-gray-700' : 'bg-gray-200'} mx-1 hidden sm:block`} />
 
-      {/* View switcher — hidden on mobile (bottom nav handles it) */}
       <nav aria-label="מצב תצוגה" className="hidden sm:flex items-center gap-1 bg-transparent">
         {VIEWS.map(({ mode, label, icon }) => {
           const isActive = viewMode === mode
@@ -98,24 +117,24 @@ export const Header: React.FC<Props> = ({ viewMode, darkMode, onViewChange, onDa
 
       <div className="flex-1" />
 
-      {/* Right controls */}
       <div className="flex items-center gap-2">
-        {/* Google Calendar sync — desktop only */}
-        {(googleAuthUrl || calendarSyncing !== undefined) && (
+        {(googleAuthUrl || googleAuthStatus || calendarSyncing !== undefined) && (
           <div className="hidden sm:flex items-center gap-1.5">
             <a
-              href={googleAuthUrl || undefined}
+              href={connectDisabled ? undefined : googleAuthUrl}
+              aria-disabled={connectDisabled}
+              title={connectHint || undefined}
               className={`text-xs font-semibold px-3 py-1.5 rounded border transition-colors ${
-                googleAuthUrl
+                connectDisabled
                   ? darkMode
-                    ? 'bg-sky-800 border-sky-700 text-sky-100 hover:bg-sky-700'
-                    : 'bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100'
-                  : darkMode
                     ? 'bg-gray-700 border-gray-600 text-gray-500 pointer-events-none'
                     : 'bg-gray-100 border-gray-200 text-gray-400 pointer-events-none'
+                  : darkMode
+                    ? 'bg-sky-800 border-sky-700 text-sky-100 hover:bg-sky-700'
+                    : 'bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100'
               }`}
             >
-              חבר יומן
+              {connectLabel}
             </a>
             <button
               type="button"
@@ -128,7 +147,12 @@ export const Header: React.FC<Props> = ({ viewMode, darkMode, onViewChange, onDa
           </div>
         )}
 
-        {/* Dark mode toggle */}
+        {connectHint && (
+          <div className={`hidden lg:block text-[11px] leading-4 max-w-[220px] ${mutedText}`}>
+            {connectHint}
+          </div>
+        )}
+
         <button
           onClick={onDarkModeToggle}
           aria-label={darkMode ? 'עבור למצב בהיר' : 'עבור למצב כהה'}
@@ -148,7 +172,6 @@ export const Header: React.FC<Props> = ({ viewMode, darkMode, onViewChange, onDa
           )}
         </button>
 
-        {/* Auto-save indicator */}
         <div className={`flex items-center gap-1.5 text-xs ${mutedText} hidden sm:flex`}>
           <span>נשמר</span>
           <svg className="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">

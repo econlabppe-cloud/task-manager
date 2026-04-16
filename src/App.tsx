@@ -11,6 +11,7 @@ import { useBridgeSync } from './hooks/useBridgeSync'
 import { useGoogleCalendarSync } from './hooks/useGoogleCalendarSync'
 import { useGoogleCalendarAutoSync } from './hooks/useGoogleCalendarAutoSync'
 import { fetchGoogleCalendarAuthStatus } from './googleCalendarSync'
+import type { GoogleCalendarAuthStatus } from './googleCalendarSync'
 import { useAssistantCapture } from './hooks/useAssistantCapture'
 import { useShoppingList } from './hooks/useShoppingList'
 import { useConfetti, ConfettiOverlay } from './hooks/useConfetti'
@@ -43,6 +44,7 @@ export default function App() {
   const [allowedAccess, setAllowedAccess] = React.useState(true)
   const [authChecked, setAuthChecked] = React.useState(false)
   const [signedEmail, setSignedEmail] = React.useState('')
+  const [googleAuthStatus, setGoogleAuthStatus] = React.useState<GoogleCalendarAuthStatus | null>(null)
 
   // Custom hooks
   const bridgeStatus = useBridgeSync(setState)
@@ -134,12 +136,16 @@ export default function App() {
   React.useEffect(() => {
     void fetchGoogleCalendarAuthStatus()
       .then(status => {
+        setGoogleAuthStatus(status)
         setAccessGateEnabled(Boolean(status.accessGateEnabled))
         setAllowedAccess(status.allowed !== false)
         setSignedEmail(status.email ?? '')
         setAuthChecked(true)
       })
-      .catch(() => { setAuthChecked(true) })
+      .catch(() => {
+        setGoogleAuthStatus(null)
+        setAuthChecked(true)
+      })
   }, [])
 
   // ── Global shortcut Ctrl+K ───────────────────────────────────────
@@ -291,6 +297,7 @@ export default function App() {
         onViewChange={setViewMode}
         onDarkModeToggle={toggleDarkMode}
         googleAuthUrl={googleSyncState.authUrl}
+        googleAuthStatus={googleAuthStatus}
         calendarSyncing={googleSyncState.isSyncing}
         onCalendarSync={() => { void googleSyncControls.manualSync() }}
       />
